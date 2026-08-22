@@ -19,7 +19,9 @@ Then open the URL Vite prints (usually `http://localhost:5173`) in Chrome, Edge,
 
 The live site is at https://alternativesoap.github.io/SoapsConfigEditor/.
 
-In the repo **Settings → Pages**, set **Source** to **GitHub Actions** (not “Deploy from a branch”). Pushes to `main` build and publish the site automatically.
+In the repo **Settings → Pages**, set **Source** to **GitHub Actions**. Keep it on Actions (not “Deploy from a branch” from the repo root). The root `index.html` is for local Vite only and will break on Pages if published as-is.
+
+Pushes to `main` build the site and publish it automatically.
 
 1. Click **Open Folder**.
 2. Choose your MythicMobs `Packs` folder, or any folder of YAML files.
