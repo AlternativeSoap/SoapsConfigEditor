@@ -15,6 +15,12 @@ npm run dev
 
 Then open the URL Vite prints (usually `http://localhost:5173`) in Chrome, Edge, Brave, or Firefox. Do not use Cursor's built-in preview if folder picking fails. Open the URL in a real browser.
 
+## GitHub Pages
+
+The live site is at https://alternativesoap.github.io/SoapsConfigEditor/.
+
+In the repo **Settings → Pages**, set **Source** to **GitHub Actions** (not “Deploy from a branch”). Pushes to `main` build and publish the site automatically.
+
 1. Click **Open Folder**.
 2. Choose your MythicMobs `Packs` folder, or any folder of YAML files.
 3. Allow edit access when the browser asks.

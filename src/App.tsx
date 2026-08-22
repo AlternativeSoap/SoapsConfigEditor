@@ -1108,7 +1108,7 @@ function App() {
   if (!sessionHydrated) {
     return (
       <main className="welcome dashboard">
-        <img src="/favicon.svg" alt="" width={56} height={56} />
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
         <h1>Soaps Config Editor</h1>
         <p className="welcome-note">Loading your last session…</p>
       </main>
@@ -1118,7 +1118,7 @@ function App() {
   if (!hasFolder) {
     return (
       <main className="welcome dashboard">
-        <img src="/favicon.svg" alt="" width={56} height={56} />
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
         <h1>Soaps Config Editor</h1>
         <p>Choose the plugin you want to edit. This tells the editor which tools to show.</p>
         <WorkspaceTiles selected={workspaceId} onSelect={selectWorkspace} />
@@ -1208,7 +1208,7 @@ function App() {
     <main className={`app-shell${refPanelOpen ? ' ref-open' : ''}`}>
       <header className="topbar">
         <div className="brand">
-          <img src="/favicon.svg" alt="" width={28} height={28} />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={28} height={28} />
           <div className="brand-text">
             <h1>Soaps Config Editor</h1>
             <p className="brand-subtitle">
