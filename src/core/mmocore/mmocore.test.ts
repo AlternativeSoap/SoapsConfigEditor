@@ -23,9 +23,9 @@ import { parseClassYaml } from './parseClass'
 import type { FileRecord } from '../../types'
 
 describe('scaffoldPack', () => {
-  it('scaffolds mythicmobs pack tree', () => {
+  it('scaffolds mythicmobs pack tree under MythicMobs/Packs', () => {
     const files = scaffoldPack('mythicmobs', { packName: 'Demo Pack' })
-    expect(files.some((f) => f.path.includes('Packs/Demo_Pack/mobs/'))).toBe(true)
+    expect(files.some((f) => f.path.includes('MythicMobs/Packs/Demo_Pack/Mobs/'))).toBe(true)
     expect(files.some((f) => f.path.endsWith('packinfo.yml'))).toBe(true)
   })
 

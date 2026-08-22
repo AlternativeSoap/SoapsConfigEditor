@@ -327,12 +327,23 @@ textarea:focus {
   max-width: 36rem;
 }
 
-.tile-grid {
+.tile-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 240px));
   gap: 0.75rem;
   margin: 0.5rem 0 0.25rem;
+  width: min(100%, 520px);
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
   text-align: left;
+}
+
+.tile-grid-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 100%;
 }
 
 .workspace-tile {
@@ -345,6 +356,49 @@ textarea:focus {
   border: none;
   border-radius: var(--radius-lg);
   transition: background 0.15s ease;
+}
+
+.workspace-tile-mythic {
+  grid-column: 1 / -1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.workspace-tile-select {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem 1rem 0.75rem;
+  align-content: start;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.workspace-tile-select:hover {
+  background: transparent;
+}
+
+.workspace-tile-compact {
+  min-height: 0;
+  padding: 0.7rem 0.85rem;
+  gap: 0.25rem;
+}
+
+.workspace-tile-compact h2 {
+  font-size: 0.92rem;
+}
+
+.workspace-tile-compact p {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.workspace-tile-compact .tile-meta {
+  font-size: 0.7rem;
 }
 
 .workspace-tile h2 {
@@ -366,18 +420,71 @@ textarea:focus {
   color: var(--accent-text);
 }
 
+.tile-addons {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem 1rem 0.9rem;
+  border-top: 1px solid color-mix(in srgb, var(--text-secondary) 22%, transparent);
+}
+
+.tile-addon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tile-addon-copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.tile-addon-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tile-addon-hint {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
 .workspace-tile.active {
   background: var(--surface-active);
 }
 
-.workspace-tile:hover {
+.workspace-tile:hover,
+.workspace-tile-mythic:hover {
   background: var(--btn-bg-hover);
 }
 
+.workspace-tile.active:hover,
+.workspace-tile-mythic.active:hover {
+  background: var(--surface-active);
+}
+
+button.workspace-tile:hover {
+  background: var(--btn-bg-hover);
+}
+
+button.workspace-tile.active:hover {
+  background: var(--surface-active);
+}
+
 @media (max-width: 640px) {
-  .tile-grid {
-    grid-template-columns: minmax(0, 1fr);
+  .tile-layout {
     width: min(100%, 360px);
+  }
+
+  .tile-grid,
+  .tile-grid-compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-tile-mythic {
+    grid-column: auto;
   }
 }
 
@@ -1544,59 +1651,69 @@ button.tree-row.pack .chevron {
 }
 
 .dialog-new-pack {
-  width: min(520px, 100%);
+  width: min(440px, 100%);
+  gap: 0.9rem;
+  padding: 1.15rem 1.2rem 1rem;
+}
+
+.new-pack-header {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.new-pack-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .new-pack-lead {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   line-height: 1.45;
   color: var(--text-secondary);
+  opacity: 1;
 }
 
-.new-pack-fields {
+.new-pack-name {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.new-pack-panel {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  grid-column: 1 / -1;
+  gap: 0.85rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
 }
 
-.new-pack-fields > label {
-  grid-column: 1 / -1;
-}
-
-.new-pack-section {
-  margin: 0;
-  padding: 0;
-  border: none;
+.new-pack-block {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
 .new-pack-section-title {
-  font-size: 0.78rem;
+  margin: 0;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  padding: 0;
-}
-
-.new-pack-section-hint {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.4;
+  letter-spacing: 0.05em;
   color: var(--text-secondary);
 }
 
 .new-pack-save-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 480px) {
   .new-pack-save-actions {
     grid-template-columns: 1fr;
   }
@@ -1606,90 +1723,134 @@ button.tree-row.pack .chevron {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.7rem 0.8rem;
+  gap: 0.18rem;
+  padding: 0.55rem 0.65rem;
   text-align: left;
   height: auto;
+  width: 100%;
+  background: var(--btn-bg);
+  box-shadow: inset 0 0 0 1px transparent;
 }
 
 .new-pack-save-btn:hover:not(:disabled) {
   background: var(--btn-bg-hover);
 }
 
-.new-pack-save-btn.primary {
-  background: #6b5b8a;
-  color: #fff;
+.new-pack-save-btn.selected {
+  background: var(--surface-active);
+  box-shadow: inset 0 0 0 1px rgba(139, 122, 168, 0.45);
+  color: inherit;
 }
 
-.new-pack-save-btn.primary:hover:not(:disabled) {
-  background: #756589;
+.new-pack-save-btn.selected:hover:not(:disabled) {
+  background: var(--surface-active);
 }
 
-.new-pack-shortcuts {
-  padding: 0.6rem 0.7rem;
-  border-radius: var(--radius-lg);
-  background: var(--btn-bg);
-  border: none;
+.new-pack-save-btn:disabled {
+  opacity: 0.45;
 }
 
 .new-pack-save-btn-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
 }
 
 .new-pack-save-btn-desc {
   font-size: 0.72rem;
   line-height: 1.35;
-  opacity: 0.8;
+  color: var(--text-secondary);
   font-weight: 400;
 }
 
-.new-pack-toggle {
+.new-pack-autosave {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.new-pack-switch-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-  cursor: pointer;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.new-pack-toggle input {
-  width: auto;
-  margin: 0;
-}
-
-.new-pack-interval {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-}
-
-.new-pack-interval select {
-  flex: 1;
+.new-pack-switch-copy {
+  display: grid;
+  gap: 0.15rem;
   min-width: 0;
 }
 
-.new-pack-shortcuts ul {
-  margin: 0.35rem 0 0;
-  padding-left: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.82rem;
+.new-pack-switch-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
   color: var(--text-secondary);
+  opacity: 1;
+}
+
+.new-pack-interval-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.new-pack-chip {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  background: var(--btn-bg);
+  color: var(--text-secondary);
+}
+
+.new-pack-chip:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  color: var(--text-primary);
+}
+
+.new-pack-chip.active {
+  background: #6b5b8a;
+  color: #fff;
+}
+
+.new-pack-chip.active:hover:not(:disabled) {
+  background: #756589;
+  color: #fff;
+}
+
+.new-pack-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem 0.35rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.new-pack-shortcuts-sep {
+  margin: 0 0.2rem;
+  opacity: 0.5;
 }
 
 .new-pack-shortcuts kbd {
   display: inline-block;
-  min-width: 1.4em;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
+  min-width: 1.25em;
+  padding: 0.08rem 0.28rem;
+  border-radius: var(--radius-sm);
   border: none;
-  background: var(--input-surface);
+  background: var(--surface-muted);
   font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  font-size: 0.68rem;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.dialog-new-pack .dialog-actions {
+  margin-top: 0.1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
 }
 
 .welcome-actions .primary {
@@ -1894,6 +2055,7 @@ button.tree-row.pack .chevron {
 }
 
 /* ── Toggle switch ───────────────────────────────────────────── */
+.switch,
 .toggle-btn {
   position: relative;
   width: 36px;
@@ -1907,10 +2069,12 @@ button.tree-row.pack .chevron {
   transition: background 0.2s;
 }
 
+.switch.on,
 .toggle-btn.on {
   background: #6b5b8a;
 }
 
+.switch-knob,
 .toggle-knob {
   position: absolute;
   top: 3px;
@@ -1923,8 +2087,32 @@ button.tree-row.pack .chevron {
   display: block;
 }
 
+.switch.on .switch-knob,
 .toggle-btn.on .toggle-knob {
   transform: translateX(16px);
+}
+
+.switch:disabled,
+.toggle-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.switch-sm {
+  width: 30px;
+  height: 17px;
+  border-radius: 9px;
+}
+
+.switch-sm .switch-knob {
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+}
+
+.switch-sm.on .switch-knob {
+  transform: translateX(13px);
 }
 
 /* ── Autocomplete help panel ─────────────────────────────────── */
@@ -2918,10 +3106,11 @@ button.active:not(.primary) {
 .dialog.class-wizard label.wz-toggle,
 .dialog.class-wizard .wz-toggle {
   flex-direction: row;
-  align-items: flex-start;
-  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin: 0;
-  padding: 0.45rem 0.55rem;
+  padding: 0.5rem 0.6rem;
   border-radius: var(--radius-md);
   cursor: pointer;
 }
@@ -2930,7 +3119,6 @@ button.active:not(.primary) {
   background: var(--surface-hover);
 }
 
-.dialog.class-wizard .wz-toggle input[type='checkbox'],
 .dialog.class-wizard .wz-toggle input[type='radio'] {
   flex-shrink: 0;
   width: 1.05rem;
@@ -2944,6 +3132,7 @@ button.active:not(.primary) {
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
+  flex: 1;
 }
 
 .wz-toggle-title {
@@ -2963,10 +3152,8 @@ button.active:not(.primary) {
   align-items: center !important;
   justify-content: center;
   padding: 0 !important;
-}
-
-.wz-toggle-compact input {
-  margin: 0 !important;
+  background: transparent !important;
+  cursor: default;
 }
 
 .dialog.class-wizard label.wz-field {
@@ -3258,6 +3445,11 @@ button.active:not(.primary) {
 .chip {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
+}
+
+.chip.active {
+  border-color: var(--accent, #5b8def);
+  background: color-mix(in srgb, var(--accent, #5b8def) 18%, transparent);
 }
 
 .skill-card {

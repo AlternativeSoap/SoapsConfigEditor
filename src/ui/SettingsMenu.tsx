@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AcPrefs, SavePrefs, ThemeMode } from '../types'
+import { Switch } from './Switch'
 
 interface SettingsMenuProps {
   theme: ThemeMode
@@ -166,15 +167,11 @@ export function SettingsMenu({
 
                 <div className="setting-row">
                   <span className="setting-label">Enable autocomplete</span>
-                  <button
-                    type="button"
-                    className={acPrefs.enabled ? 'toggle-btn on' : 'toggle-btn'}
-                    role="switch"
-                    aria-checked={acPrefs.enabled}
-                    onClick={() => onAcPrefsChange({ enabled: !acPrefs.enabled })}
-                  >
-                    <span className="toggle-knob" />
-                  </button>
+                  <Switch
+                    checked={acPrefs.enabled}
+                    onChange={(v) => onAcPrefsChange({ enabled: v })}
+                    aria-label="Enable autocomplete"
+                  />
                 </div>
 
                 {acPrefs.enabled && (
@@ -185,15 +182,11 @@ export function SettingsMenu({
                           <span className="ac-toggle-label">{label}</span>
                           <span className="ac-toggle-hint">{hint}</span>
                         </div>
-                        <button
-                          type="button"
-                          className={(acPrefs[key] as boolean) ? 'toggle-btn on' : 'toggle-btn'}
-                          role="switch"
-                          aria-checked={acPrefs[key] as boolean}
-                          onClick={() => onAcPrefsChange({ [key]: !(acPrefs[key] as boolean) })}
-                        >
-                          <span className="toggle-knob" />
-                        </button>
+                        <Switch
+                          checked={acPrefs[key] as boolean}
+                          onChange={(v) => onAcPrefsChange({ [key]: v })}
+                          aria-label={label}
+                        />
                       </div>
                     ))}
                   </div>
@@ -213,15 +206,11 @@ export function SettingsMenu({
                   <span className="setting-label">Auto-save</span>
                   <span className="ac-toggle-hint">Silently saves all edited files on a timer</span>
                 </div>
-                <button
-                  type="button"
-                  className={savePrefs.autoSave ? 'toggle-btn on' : 'toggle-btn'}
-                  role="switch"
-                  aria-checked={savePrefs.autoSave}
-                  onClick={() => onSavePrefsChange({ autoSave: !savePrefs.autoSave })}
-                >
-                  <span className="toggle-knob" />
-                </button>
+                <Switch
+                  checked={savePrefs.autoSave}
+                  onChange={(v) => onSavePrefsChange({ autoSave: v })}
+                  aria-label="Auto-save"
+                />
               </div>
 
               {savePrefs.autoSave && (
@@ -266,15 +255,11 @@ export function SettingsMenu({
                       <span className="setting-label">Auto-backup</span>
                       <span className="ac-toggle-hint">ZIP all files automatically on save</span>
                     </div>
-                    <button
-                      type="button"
-                      className={savePrefs.autoBackup ? 'toggle-btn on' : 'toggle-btn'}
-                      role="switch"
-                      aria-checked={savePrefs.autoBackup}
-                      onClick={() => onSavePrefsChange({ autoBackup: !savePrefs.autoBackup })}
-                    >
-                      <span className="toggle-knob" />
-                    </button>
+                    <Switch
+                      checked={savePrefs.autoBackup}
+                      onChange={(v) => onSavePrefsChange({ autoBackup: v })}
+                      aria-label="Auto-backup"
+                    />
                   </div>
 
                   {savePrefs.autoBackup && (

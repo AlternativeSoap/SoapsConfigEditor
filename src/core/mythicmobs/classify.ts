@@ -7,10 +7,21 @@ const CATEGORY_FOLDERS: Record<string, MythicCategory> = {
   droptables: 'droptables',
   randomspawns: 'randomspawns',
   menus: 'menus',
+  archetypes: 'archetypes',
+  reagents: 'reagents',
 }
 
 export function classifyMythicCategory(filePath: string): MythicCategory {
-  const segments = filePath.replace(/\\/g, '/').split('/').filter(Boolean)
+  const normalized = filePath.replace(/\\/g, '/')
+  const baseName = normalized.split('/').pop()?.toLowerCase() ?? ''
+  if (baseName === 'reagents.yml' || baseName.startsWith('reagents.')) {
+    return 'reagents'
+  }
+  if (baseName === 'stats.yml' || baseName.endsWith('.stat.yml')) {
+    return 'other'
+  }
+
+  const segments = normalized.split('/').filter(Boolean)
   for (const segment of segments) {
     const mapped = CATEGORY_FOLDERS[segment.toLowerCase()]
     if (mapped) return mapped

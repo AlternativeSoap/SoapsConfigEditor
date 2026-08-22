@@ -32,7 +32,17 @@ const EQUIPMENT_SLOT_META: { slot: typeof EQUIPMENT_SLOTS[number]; icon: string;
   { slot: 'OFFHAND',icon: '🛡️', label: 'Off Hand' },
 ]
 
-type MythicCreateKind = Exclude<CreateKind, 'class' | 'mmocore-skill'>
+type MythicCreateKind = Exclude<
+  CreateKind,
+  | 'class'
+  | 'mmocore-skill'
+  | 'elements'
+  | 'skill-casting'
+  | 'spell'
+  | 'archetype'
+  | 'reagent'
+  | 'quest'
+>
 
 interface CreateDialogProps {
   kind: MythicCreateKind

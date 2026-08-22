@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CreateKind, WorkspaceKind } from '../types'
+import type { MythicAddons } from '../core/workspaces/mythicAddons'
 
 interface NewMenuProps {
   disabled: boolean
   workspace: WorkspaceKind
+  mythicAddons?: MythicAddons
   onCreate: (kind: CreateKind) => void
 }
 
@@ -15,6 +17,12 @@ const MYTHIC_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'randomspawn', label: 'New random spawn' },
 ]
 
+const MYTHIC_RPG_ITEMS: { kind: CreateKind; label: string }[] = [
+  { kind: 'spell', label: 'New spell' },
+  { kind: 'archetype', label: 'New archetype' },
+  { kind: 'reagent', label: 'New reagent' },
+]
+
 const MMOCORE_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'class', label: 'New class' },
   { kind: 'mmocore-skill', label: 'New skill' },
@@ -22,10 +30,22 @@ const MMOCORE_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'skill-casting', label: 'Skill casting mode' },
 ]
 
-export function NewMenu({ disabled, workspace, onCreate }: NewMenuProps) {
+const SOAPSQUEST_ITEMS: { kind: CreateKind; label: string }[] = [
+  { kind: 'quest', label: 'New quest' },
+]
+
+export function NewMenu({ disabled, workspace, mythicAddons, onCreate }: NewMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const items = workspace === 'mmocore' ? MMOCORE_ITEMS : MYTHIC_ITEMS
+  const items =
+    workspace === 'mmocore'
+      ? MMOCORE_ITEMS
+      : workspace === 'soapsquest'
+        ? SOAPSQUEST_ITEMS
+        : [
+            ...MYTHIC_ITEMS,
+            ...(mythicAddons?.mythicrpg ? MYTHIC_RPG_ITEMS : []),
+          ]
 
   useEffect(() => {
     if (!open) return

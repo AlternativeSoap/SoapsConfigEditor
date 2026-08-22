@@ -43,10 +43,21 @@ import {
   detectMMOCorePackName,
 } from './core/mmocore/classify'
 import { indexMMOCorePack } from './core/mmocore/indexPack'
+import {
+  classifySoapsQuestCategory,
+  detectSoapsQuestPackName,
+} from './core/soapsquest/classify'
+import { extractQuestIds } from './core/soapsquest/questIds'
 import { matchesSearch } from './core/search/matchFiles'
 import { buildPackTree, categoryKey, CATEGORY_LABEL } from './core/search/packTree'
 import { extractTopLevelIds, parseYaml } from './core/yaml/parseYaml'
-import { getWorkspace, parseWorkspaceKind } from './core/workspaces/profiles'
+import { getWorkspace, parseWorkspaceKind, wasLegacyMythicRpgWorkspace } from './core/workspaces/profiles'
+import {
+  DEFAULT_MYTHIC_ADDONS,
+  loadMythicAddons,
+  saveMythicAddons,
+  type MythicAddons,
+} from './core/workspaces/mythicAddons'
 import { sanitizePackFolderName, scaffoldPack } from './core/workspaces/scaffoldPack'
 import type {
   AcPrefs,
@@ -72,12 +83,22 @@ import { ClassWizardDialog } from './ui/mmocore/ClassWizardDialog'
 import { CreateMythicLibSkillDialog } from './ui/mmocore/CreateMythicLibSkillDialog'
 import { ElementsEditorDialog } from './ui/mmocore/ElementsEditorDialog'
 import { SkillCastingDialog } from './ui/mmocore/SkillCastingDialog'
+import { ArchetypeWizardDialog } from './ui/mythicrpg/ArchetypeWizardDialog'
+import { ReagentWizardDialog } from './ui/mythicrpg/ReagentWizardDialog'
+import { SpellWizardDialog } from './ui/mythicrpg/SpellWizardDialog'
+import { QuestWizardDialog } from './ui/soapsquest/QuestWizardDialog'
 import { ReferencePanel } from './ui/ReferencePanel'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { TopbarFileMenu } from './ui/TopbarFileMenu'
 import { WorkspaceTiles } from './ui/WorkspaceTiles'
 import { YamlEditor, type YamlEditorHandle } from './ui/YamlEditor'
 import { EMPTY_CONTEXT, type SkillLineContext } from './core/mythicmobs/skillLineAttrs'
+
+function fileIdsForCategory(category: MythicCategory, content: string): string[] {
+  if (category === 'exp-curves') return []
+  if (category === 'quests') return extractQuestIds(content)
+  return extractTopLevelIds(parseYaml(content).data)
+}
 
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(
@@ -157,9 +178,17 @@ function App() {
     const stored = Number(localStorage.getItem('soaps-ref-width'))
     return Number.isFinite(stored) && stored >= 200 ? stored : 280
   })
-  const [workspaceId, setWorkspaceId] = useState<WorkspaceKind | null>(() =>
-    parseWorkspaceKind(localStorage.getItem('soaps-workspace')),
-  )
+  const [workspaceId, setWorkspaceId] = useState<WorkspaceKind | null>(() => {
+    const raw = localStorage.getItem('soaps-workspace')
+    const parsed = parseWorkspaceKind(raw)
+    if (wasLegacyMythicRpgWorkspace(raw)) {
+      const next = { ...loadMythicAddons(), mythicrpg: true }
+      saveMythicAddons(next)
+      if (parsed) localStorage.setItem('soaps-workspace', parsed)
+    }
+    return parsed
+  })
+  const [mythicAddons, setMythicAddons] = useState<MythicAddons>(() => loadMythicAddons())
   const [sidebarHidden, setSidebarHidden] = useState(
     () => localStorage.getItem('soaps-sidebar-hidden') === '1',
   )
@@ -178,6 +207,8 @@ function App() {
   const workspace = getWorkspace(workspaceId)
   const isMythicMobs = workspaceId === 'mythicmobs'
   const isMMOCore = workspaceId === 'mmocore'
+  const isSoapsQuest = workspaceId === 'soapsquest'
+  const mythicRpgEnabled = isMythicMobs && mythicAddons.mythicrpg
   const hasFolder = files.length > 0 || rootLabel.length > 0
   const activeFile = files.find((file) => file.path === activePath) ?? null
   const isDirty = activePath ? dirtyMap.has(activePath) : false
@@ -207,6 +238,8 @@ function App() {
   packDisplayNameRef.current = packDisplayName
   const workspaceIdRef = useRef(workspaceId)
   workspaceIdRef.current = workspaceId
+  const mythicAddonsRef = useRef(mythicAddons)
+  mythicAddonsRef.current = mythicAddons
   const openPacksRef = useRef(openPacks)
   openPacksRef.current = openPacks
   const openCategoriesRef = useRef(openCategories)
@@ -228,6 +261,7 @@ function App() {
       version: 1,
       savedAt: Date.now(),
       workspaceId: workspaceIdRef.current,
+      mythicAddons: mythicAddonsRef.current,
       sessionMode: sessionModeRef.current,
       rootLabel: rootLabelRef.current,
       packDisplayName: packDisplayNameRef.current,
@@ -254,8 +288,23 @@ function App() {
 
   function applySessionSnapshot(snapshot: EditorSessionSnapshot): void {
     if (snapshot.workspaceId) {
-      setWorkspaceId(snapshot.workspaceId)
-      localStorage.setItem('soaps-workspace', snapshot.workspaceId)
+      const rawId = snapshot.workspaceId as string
+      const migrated = parseWorkspaceKind(rawId)
+      if (migrated) {
+        setWorkspaceId(migrated)
+        localStorage.setItem('soaps-workspace', migrated)
+      }
+      if (wasLegacyMythicRpgWorkspace(rawId) || snapshot.mythicAddons) {
+        const next = wasLegacyMythicRpgWorkspace(rawId)
+          ? { ...(snapshot.mythicAddons ?? loadMythicAddons()), mythicrpg: true }
+          : { ...DEFAULT_MYTHIC_ADDONS, ...snapshot.mythicAddons }
+        setMythicAddons(next)
+        saveMythicAddons(next)
+      }
+    } else if (snapshot.mythicAddons) {
+      const next = { ...DEFAULT_MYTHIC_ADDONS, ...snapshot.mythicAddons }
+      setMythicAddons(next)
+      saveMythicAddons(next)
     }
     setFiles(snapshot.files)
     setRootLabel(snapshot.rootLabel)
@@ -278,6 +327,12 @@ function App() {
         pack: detectMMOCorePackName(path),
       }
     }
+    if (workspaceId === 'soapsquest') {
+      return {
+        category: classifySoapsQuestCategory(path),
+        pack: detectSoapsQuestPackName(path),
+      }
+    }
     return {
       category: classifyMythicCategory(path),
       pack: detectPackName(path, rootPath),
@@ -289,8 +344,7 @@ function App() {
     rootPath: string,
   ): FileRecord {
     const { category, pack } = classifyFile(file.path, rootPath)
-    const ids =
-      category === 'exp-curves' ? [] : extractTopLevelIds(parseYaml(file.content).data)
+    const ids = fileIdsForCategory(category, file.content)
     return { ...file, category, pack, ids }
   }
   const parseIssues = useMemo(() => {
@@ -323,10 +377,7 @@ function App() {
       return {
         ...f,
         content: pending,
-        ids:
-          f.category === 'exp-curves'
-            ? []
-            : extractTopLevelIds(parseYaml(pending).data),
+        ids: fileIdsForCategory(f.category, pending),
       }
     })
   }, [files, dirtyMap])
@@ -363,6 +414,14 @@ function App() {
   function selectWorkspace(id: WorkspaceKind): void {
     setWorkspaceId(id)
     localStorage.setItem('soaps-workspace', id)
+  }
+
+  function updateMythicAddons(partial: Partial<MythicAddons>): void {
+    setMythicAddons((prev) => {
+      const next = { ...prev, ...partial }
+      saveMythicAddons(next)
+      return next
+    })
   }
 
   function changeWorkspace(): void {
@@ -534,10 +593,7 @@ function App() {
       const nextFiles = records.map((f) => ({
         ...f,
         content: dirty.get(f.path) ?? f.content,
-        ids:
-          f.category === 'exp-curves'
-            ? []
-            : extractTopLevelIds(parseYaml(dirty.get(f.path) ?? f.content).data),
+        ids: fileIdsForCategory(f.category, dirty.get(f.path) ?? f.content),
       }))
       setFiles(nextFiles)
       setDirtyMap(new Map())
@@ -574,7 +630,10 @@ function App() {
       autoSaveInterval: options.autoSaveInterval,
     })
 
-    const scaffolded = scaffoldPack(workspaceId, { packName: options.packName })
+    const scaffolded = scaffoldPack(workspaceId, {
+      packName: options.packName,
+      mythicAddons: workspaceId === 'mythicmobs' ? mythicAddons : undefined,
+    })
     const mapped = scaffolded
       .map((file) => toFileRecord(file, options.packName))
       .sort((a, b) => a.path.localeCompare(b.path))
@@ -685,10 +744,7 @@ function App() {
             ? {
                 ...f,
                 content,
-                ids:
-                  f.category === 'exp-curves'
-                    ? []
-                    : extractTopLevelIds(parseYaml(content).data),
+                ids: fileIdsForCategory(f.category, content),
               }
             : f,
         )
@@ -774,13 +830,10 @@ function App() {
           throw err
         }
       }
-      const parsed = filePath.toLowerCase().endsWith('.txt')
-        ? { data: null, issues: [] }
-        : parseYaml(content)
       const updated: FileRecord = {
         ...fileRec,
         content,
-        ids: fileRec.category === 'exp-curves' ? [] : extractTopLevelIds(parsed.data),
+        ids: fileIdsForCategory(fileRec.category, content),
       }
       if (!silent) {
         if (result.downloaded) {
@@ -971,6 +1024,7 @@ function App() {
     sessionMode,
     packDisplayName,
     workspaceId,
+    mythicAddons,
     openPacks,
     openCategories,
     search,
@@ -1084,7 +1138,10 @@ function App() {
       kind === 'class' ||
       kind === 'mmocore-skill' ||
       kind === 'elements' ||
-      kind === 'skill-casting'
+      kind === 'skill-casting' ||
+      kind === 'spell' ||
+      kind === 'archetype' ||
+      kind === 'reagent'
     ) {
       return activePath
     }
@@ -1121,7 +1178,12 @@ function App() {
         <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
         <h1>Soaps Config Editor</h1>
         <p>Choose the plugin you want to edit. This tells the editor which tools to show.</p>
-        <WorkspaceTiles selected={workspaceId} onSelect={selectWorkspace} />
+        <WorkspaceTiles
+          selected={workspaceId}
+          onSelect={selectWorkspace}
+          mythicAddons={mythicAddons}
+          onMythicAddonsChange={updateMythicAddons}
+        />
         {workspace ? (
           <>
             <p>{workspace.hint}</p>
@@ -1241,10 +1303,13 @@ function App() {
             {needsSaveFolder ? 'Save to folder' : canWriteToDisk ? 'Save' : 'Download'}
             {isDirty ? ' *' : ''}
           </button>
-          {isMythicMobs || isMMOCore ? (
+          {isMythicMobs || isMMOCore || isSoapsQuest ? (
             <NewMenu
               disabled={files.length === 0}
-              workspace={isMMOCore ? 'mmocore' : 'mythicmobs'}
+              workspace={
+                isMMOCore ? 'mmocore' : isSoapsQuest ? 'soapsquest' : 'mythicmobs'
+              }
+              mythicAddons={isMythicMobs ? mythicAddons : undefined}
               onCreate={handleCreate}
             />
           ) : null}
@@ -1573,7 +1638,11 @@ function App() {
       createKind !== 'class' &&
       createKind !== 'mmocore-skill' &&
       createKind !== 'elements' &&
-      createKind !== 'skill-casting' ? (
+      createKind !== 'skill-casting' &&
+      createKind !== 'spell' &&
+      createKind !== 'archetype' &&
+      createKind !== 'reagent' &&
+      createKind !== 'quest' ? (
         <CreateDialog
           kind={createKind}
           files={files}
@@ -1581,6 +1650,50 @@ function App() {
           suggestedPath={suggestedPathForKind(createKind)}
           onClose={() => setCreateKind(null)}
           onInsert={insertGenerated}
+        />
+      ) : null}
+      {createKind === 'spell' && mythicRpgEnabled ? (
+        <SpellWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          reagentIds={effectiveFiles
+            .filter((f) => f.category === 'reagents')
+            .flatMap((f) => f.ids)}
+          existingSkillIds={packIndex.skillIds}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Spell added. Save the file to keep it.')
+          }}
+        />
+      ) : null}
+      {createKind === 'archetype' && mythicRpgEnabled ? (
+        <ArchetypeWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          skillIds={packIndex.skillIds}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Archetype added. Save the file to keep it.')
+          }}
+        />
+      ) : null}
+      {createKind === 'reagent' && mythicRpgEnabled ? (
+        <ReagentWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingReagentIds={effectiveFiles
+            .filter((f) => f.category === 'reagents')
+            .flatMap((f) => f.ids)}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Reagent added. Save the file to keep it.')
+          }}
         />
       ) : null}
       {createKind === 'class' && isMMOCore ? (
@@ -1618,6 +1731,17 @@ function App() {
           onApply={(path, content) => {
             applyMultiFileWrite([{ path, content, mode: 'create' }])
             setCreateKind(null)
+          }}
+        />
+      ) : null}
+      {createKind === 'quest' && isSoapsQuest ? (
+        <QuestWizardDialog
+          files={effectiveFiles}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Quest added. Save the file to keep it.')
           }}
         />
       ) : null}

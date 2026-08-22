@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Switch } from '../Switch'
 import { ATTRIBUTE_CATALOG, normalizeAttributeId, resolveAttributeMeta } from '../../data/mmocore/attributes'
 import { FORMULA_CHIPS, SLOT_BUFF_PRESETS, CLASS_SKILL_TRIGGERS } from '../../data/mmocore/slotBuffs'
 import { COMMON_MATERIALS } from '../../data/mmocore/materials'
@@ -180,13 +181,13 @@ function ToggleRow({
   hint?: string
 }) {
   return (
-    <label className="wz-toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <div className="wz-toggle">
       <span className="wz-toggle-copy">
         <span className="wz-toggle-title">{title}</span>
         {hint ? <span className="wz-toggle-hint">{hint}</span> : null}
       </span>
-    </label>
+      <Switch checked={checked} onChange={onChange} aria-label={title} />
+    </div>
   )
 }
 
@@ -1591,13 +1592,14 @@ export function ClassWizardDialog({
                           })
                         }
                       />
-                      <label className="wz-toggle wz-toggle-compact" title="Show in class lore">
-                        <input
-                          type="checkbox"
+                      <div className="wz-toggle wz-toggle-compact" title="Show in class lore">
+                        <Switch
+                          size="sm"
                           checked={attr.showInLore}
-                          onChange={(e) => updateAttr(idx, { showInLore: e.target.checked })}
+                          onChange={(v) => updateAttr(idx, { showInLore: v })}
+                          aria-label={`Show ${attr.id} in class lore`}
                         />
-                      </label>
+                      </div>
                       <button
                         type="button"
                         className="wz-icon-btn"

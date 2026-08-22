@@ -17,7 +17,12 @@ export interface AcPrefs {
   activateOnTyping: boolean
 }
 
-export type WorkspaceKind = 'mythicmobs' | 'mmocore' | 'mmoitems' | 'mythicrpg'
+export type WorkspaceKind =
+  | 'mythicmobs'
+  | 'mmocore'
+  | 'mmoitems'
+  | 'soapsquest'
+  | 'soapstraits'
 
 export type MythicCategory =
   | 'mobs'
@@ -29,6 +34,9 @@ export type MythicCategory =
   | 'classes'
   | 'exp-curves'
   | 'gui'
+  | 'archetypes'
+  | 'reagents'
+  | 'quests'
   | 'other'
 
 export type SessionMode = 'opened' | 'new-pack'
@@ -89,6 +97,10 @@ export type CreateKind =
   | 'mmocore-skill'
   | 'elements'
   | 'skill-casting'
+  | 'spell'
+  | 'archetype'
+  | 'reagent'
+  | 'quest'
 
 /** Shared skill modifier used by MMOCore class skills + MythicLib parameters. */
 export interface SkillModifierValues {
@@ -291,3 +303,62 @@ export interface RandomSpawnGeneratorInput {
   biomes: string
   conditions: string
 }
+
+/** MythicRPG spell casting presets used by the spell wizard. */
+export type SpellCastingMode = 'bound' | 'click_combo' | 'passive'
+
+export interface SpellGeneratorInput {
+  id: string
+  display: string
+  description: string
+  iconMaterial: string
+  castingMode: SpellCastingMode
+  clickCombo: string
+  cooldown: number
+  upgrades: number
+  costReagent: string
+  costAmount: number
+  modifierKey: string
+  modifierBase: number
+  modifierPerLevel: number
+  skills: string
+  targeter: string
+  bindable: boolean
+  global: boolean
+  /** Passive spell Stats block (optional). */
+  passiveStatKey?: string
+  passiveStatBase?: number
+  passiveStatPerLevel?: number
+  passiveStatMax?: number
+}
+
+export interface ArchetypeGeneratorInput {
+  id: string
+  display: string
+  group: 'CLASS' | 'PROFESSION'
+  description: string
+  iconMaterial: string
+  minLevel: number
+  maxLevel: number
+  experienceCurve: string
+  experienceSource: string
+  /** Newline or comma separated spell unlock lines. */
+  spellUnlocks: string
+  /** Single BaseStats line, e.g. MAX_HEALTH 18 or MAX_MANA '50 + 5*L' */
+  baseStatLine: string
+  /** Single StatModifiers line, e.g. MAX_HEALTH 1 */
+  statModifierLine: string
+}
+
+export interface ReagentGeneratorInput {
+  id: string
+  display: string
+  global: boolean
+  minValue: string
+  maxValue: string
+  scaleWithMaxMana: boolean
+  includeResourceBar: boolean
+  writeMaxManaStat: boolean
+  maxManaBase: number
+}
+

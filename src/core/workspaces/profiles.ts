@@ -8,6 +8,8 @@ export interface WorkspaceProfile {
   summary: string
   hint: string
   tools: string[]
+  /** Smaller tile for secondary / upcoming plugins */
+  compact?: boolean
   /** Primary CTA on the welcome / top bar for scaffolding */
   startLabel: string
   /** Title for the new-scaffold dialog */
@@ -23,7 +25,7 @@ export const WORKSPACES: WorkspaceProfile[] = [
     id: 'mythicmobs',
     name: 'MythicMobs',
     summary: 'Packs, mobs, items, skills, and drop tables.',
-    hint: 'Open an existing MythicMobs Packs folder (or a root with Mobs/Skills), or start a new pack.',
+    hint: 'Open your server plugins/ folder (or MythicMobs/), or start a new pack. New packs write to MythicMobs/Packs/{name}/. Use the add-on switches on the MythicMobs tile if you use MythicRPG or Crucible.',
     tools: ['Mob generator', 'Item generator', 'Start new pack'],
     startLabel: 'Start new pack',
     startDialogTitle: 'Start new pack',
@@ -38,7 +40,7 @@ export const WORKSPACES: WorkspaceProfile[] = [
       'Open a folder that contains MMOCore/, MythicLib/, and MythicMobs/ side by side (as on a server under plugins/), or start a new workspace. Only MythicMobs uses a Packs/ folder.',
     tools: ['Class creator', 'Skill stub', 'Start new workspace'],
     startLabel: 'Start new workspace',
-    startDialogTitle: 'Start new Class Pack workspace',
+    startDialogTitle: 'Start new workspace',
     nameFieldLabel: 'MythicMobs pack name',
     confirmLabel: 'Create workspace',
   },
@@ -46,7 +48,7 @@ export const WORKSPACES: WorkspaceProfile[] = [
     id: 'mmoitems',
     name: 'MMOItems',
     summary: 'Item types, templates, and item configs.',
-    hint: 'Open your MMOItems plugin folder, or start starter files. MMOItems does not use a MythicMobs-style Packs system.',
+    hint: 'Open your MMOItems plugin folder (plugins/MMOItems/), or start starter files under MMOItems/item/. MMOItems does not use a MythicMobs-style Packs system.',
     tools: ['Start starter files'],
     startLabel: 'Start starter files',
     startDialogTitle: 'Start MMOItems starter',
@@ -54,13 +56,27 @@ export const WORKSPACES: WorkspaceProfile[] = [
     confirmLabel: 'Create files',
   },
   {
-    id: 'mythicrpg',
-    name: 'MythicRPG',
-    summary: 'RPG configs, classes, and related YAML.',
-    hint: 'Open your MythicRPG plugin folder, or start starter files.',
+    id: 'soapsquest',
+    name: 'SoapsQuest',
+    summary: 'Quest papers, tiers, and difficulties.',
+    hint:
+      'Open your SoapsQuest plugin folder (plugins/SoapsQuest/), or start a new workspace. SoapsQuest has no Packs/ system.',
+    tools: ['Quest creator', 'Start new workspace'],
+    compact: true,
+    startLabel: 'Start new workspace',
+    startDialogTitle: 'Start new workspace',
+    nameFieldLabel: 'Project name',
+    confirmLabel: 'Create workspace',
+  },
+  {
+    id: 'soapstraits',
+    name: 'SoapsTraits',
+    summary: 'Trait configs for SoapsTraits.',
+    hint: 'Open your SoapsTraits plugin folder (plugins/SoapsTraits/), or start a traits.yml starter.',
     tools: ['Start starter files'],
+    compact: true,
     startLabel: 'Start starter files',
-    startDialogTitle: 'Start MythicRPG starter',
+    startDialogTitle: 'Start SoapsTraits starter',
     nameFieldLabel: 'Project name',
     confirmLabel: 'Create files',
   },
@@ -71,9 +87,40 @@ export function getWorkspace(id: WorkspaceKind | null): WorkspaceProfile | null 
   return WORKSPACES.find((workspace) => workspace.id === id) ?? null
 }
 
+/**
+ * Parses a stored workspace id. Legacy `mythicrpg` maps to `mythicmobs`
+ * (callers should also enable the MythicRPG add-on).
+ */
 export function parseWorkspaceKind(value: string | null): WorkspaceKind | null {
-  if (value === 'mythicmobs' || value === 'mmocore' || value === 'mmoitems' || value === 'mythicrpg') {
+  if (
+    value === 'mythicmobs' ||
+    value === 'mmocore' ||
+    value === 'mmoitems' ||
+    value === 'soapsquest' ||
+    value === 'soapstraits'
+  ) {
     return value
   }
+  if (value === 'mythicrpg') {
+    return 'mythicmobs'
+  }
   return null
+}
+
+/** True when the raw storage value was the old MythicRPG-only tile. */
+export function wasLegacyMythicRpgWorkspace(value: string | null): boolean {
+  return value === 'mythicrpg'
+}
+
+export function mythicToolsLabel(mythicrpg: boolean): string[] {
+  const base = ['Mob generator', 'Item generator', 'Start new pack']
+  if (!mythicrpg) return base
+  return [
+    'Mob generator',
+    'Item generator',
+    'Spell creator',
+    'Archetype creator',
+    'Reagent starter',
+    'Start new pack',
+  ]
 }

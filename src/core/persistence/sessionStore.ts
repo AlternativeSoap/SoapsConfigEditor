@@ -1,4 +1,5 @@
 import type { FileRecord, MythicCategory, SessionMode, WorkspaceKind } from '../../types'
+import type { MythicAddons } from '../workspaces/mythicAddons'
 
 const DB_NAME = 'soaps-config-editor'
 const DB_VERSION = 1
@@ -10,6 +11,8 @@ export interface EditorSessionSnapshot {
   version: 1
   savedAt: number
   workspaceId: WorkspaceKind | null
+  /** MythicMobs add-on toggles (ignored for other workspaces). */
+  mythicAddons?: MythicAddons
   sessionMode: SessionMode
   rootLabel: string
   packDisplayName: string

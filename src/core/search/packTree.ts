@@ -10,6 +10,9 @@ export const CATEGORY_LABEL: Record<MythicCategory, string> = {
   classes: 'Classes',
   'exp-curves': 'Exp curves',
   gui: 'GUI',
+  archetypes: 'Archetypes',
+  reagents: 'Reagents',
+  quests: 'Quests',
   other: 'Other',
 }
 
