@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="base" cx="50%" cy="40%" r="80%" gradientTransform="translate(0.5 0.4) scale(1 0.75) translate(-0.5 -0.4)">
+      <stop offset="0%" stop-color="#12101a"/>
+      <stop offset="70%" stop-color="#0a0812"/>
+    </radialGradient>
+    <radialGradient id="washA" cx="16%" cy="10%" r="42%" gradientTransform="translate(0.16 0.1) scale(1 0.76) translate(-0.16 -0.1)">
+      <stop offset="0%" stop-color="rgb(107, 91, 138)" stop-opacity="0.06"/>
+      <stop offset="72%" stop-color="rgb(107, 91, 138)" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="washB" cx="84%" cy="36%" r="38%" gradientTransform="translate(0.84 0.36) scale(1 0.74) translate(-0.84 -0.36)">
+      <stop offset="0%" stop-color="rgb(90, 74, 114)" stop-opacity="0.045"/>
+      <stop offset="74%" stop-color="rgb(90, 74, 114)" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="washC" cx="44%" cy="90%" r="34%" gradientTransform="translate(0.44 0.9) scale(1 0.76) translate(-0.44 -0.9)">
+      <stop offset="0%" stop-color="rgb(139, 122, 168)" stop-opacity="0.035"/>
+      <stop offset="72%" stop-color="rgb(139, 122, 168)" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.045)"/>
+    </pattern>
+    <radialGradient id="dotMask" cx="50%" cy="42%" r="72%" gradientTransform="translate(0.5 0.42) scale(1 0.8) translate(-0.5 -0.42)">
+      <stop offset="18%" stop-color="#fff"/>
+      <stop offset="78%" stop-color="#000"/>
+    </radialGradient>
+    <mask id="dotFade">
+      <rect width="1920" height="1080" fill="url(#dotMask)"/>
+    </mask>
+  </defs>
+  <rect width="1920" height="1080" fill="#0a0812"/>
+  <rect width="1920" height="1080" fill="url(#base)"/>
+  <rect width="1920" height="1080" fill="url(#washA)"/>
+  <rect width="1920" height="1080" fill="url(#washB)"/>
+  <rect width="1920" height="1080" fill="url(#washC)"/>
+  <rect width="1920" height="1080" fill="url(#dots)" mask="url(#dotFade)"/>
+</svg>
