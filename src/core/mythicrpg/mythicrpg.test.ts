@@ -23,11 +23,12 @@ describe('mythicrpg generators', () => {
   })
 
   it('generates a Wizard archetype', () => {
-    const yaml = generateArchetypeYaml(ARCHETYPE_PRESETS[0].apply())
+    const yaml = generateArchetypeYaml(ARCHETYPE_PRESETS[0]!.apply())
     expect(yaml).toContain('Wizard:')
     expect(yaml).toContain('Group: CLASS')
     expect(yaml).toContain('ExperienceSource: SPELLCASTING')
     expect(yaml).toContain('SpellUnlocks:')
+    expect(yaml).toContain('MAGIC_MISSILE')
   })
 
   it('generates mana reagent and max mana stat', () => {

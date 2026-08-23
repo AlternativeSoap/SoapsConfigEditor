@@ -289,27 +289,19 @@ export function CreateDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg dialog-create"
-        role="dialog"
-        aria-labelledby="create-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="create-header">
-          <h2 id="create-title">{TITLE_FOR_KIND[kind]}</h2>
-          <p>
-            Fill in the fields below, then add to an existing YAML file or create a new one in this folder.
-            Save afterwards to write the file.
-          </p>
-        </header>
+    <DialogShell size="lg" className="dialog-create" labelledBy="create-title" onClose={onClose}>
+      <DialogHeader
+        title={TITLE_FOR_KIND[kind]}
+        titleId="create-title"
+        onClose={onClose}
+        lead="Fill in the fields, then add to an existing YAML file or create a new one in this folder. Save afterwards to write the file."
+      />
 
         {kind === 'mob' && (
-          <div className="dialog-fields create-sections">
+          <DialogBody className="dialog-create-body">
             <IdList ids={[]} />
-            <section className="create-section">
-              <h3 className="create-section-title">Identity</h3>
-              <div className="create-section-body">
+            <DialogPanel title="Identity">
+              <div className="dialog-fields">
                 <label>
                   ID
                   <input
@@ -368,11 +360,10 @@ export function CreateDialog({
                   />
                 </label>
               </div>
-            </section>
+            </DialogPanel>
 
-            <section className="create-section create-section-skills">
-              <div className="create-section-head">
-                <h3 className="create-section-title">Skills</h3>
+            <DialogPanel title="Skills" className="dialog-panel-skills">
+              <div className="dialog-panel-toolbar">
                 <button
                   type="button"
                   className={`slb-open-btn${builderOpen && builderContext?.source === 'mob' ? ' active' : ''}`}
@@ -382,7 +373,7 @@ export function CreateDialog({
                   {builderOpen && builderContext?.source === 'mob' ? 'Hide builder' : 'Build line'}
                 </button>
               </div>
-              <p className="create-section-hint">One skill line per row. Use Build line for a step-by-step mechanic, targeter, and trigger.</p>
+              <p className="dialog-note">One skill line per row. Use Build line for a step-by-step mechanic, targeter, and trigger.</p>
               <textarea
                 ref={skillsTextareaRef}
                 rows={4}
@@ -403,11 +394,10 @@ export function CreateDialog({
                   onApplyPresetPack={applyPresetPack}
                 />
               )}
-            </section>
+            </DialogPanel>
 
-            <section className="create-section">
-              <h3 className="create-section-title">Drops</h3>
-              <p className="create-section-hint">Drop table IDs or inline drops, one per row.</p>
+            <DialogPanel title="Drops">
+              <p className="dialog-note">Drop table IDs or inline drops, one per row.</p>
               <datalist id="droptable-ids">
                 {packIndex.droptableIds.map((id) => <option key={id} value={id} />)}
               </datalist>
@@ -417,12 +407,11 @@ export function CreateDialog({
                 onChange={(e) => setMob({ ...mob, drops: e.target.value })}
                 placeholder="MY_DROP_TABLE"
               />
-            </section>
+            </DialogPanel>
 
             
-            <section className="create-section">
-              <h3 className="create-section-title">Options</h3>
-              <p className="create-section-hint">
+            <DialogPanel title="Options">
+              <p className="dialog-note">
                 Add Options from the MythicMobs list. Only options you set are written.
               </p>
               <div className="mob-option-picker">
@@ -527,11 +516,10 @@ export function CreateDialog({
                   )
                 })}
               </div>
-            </section>
+            </DialogPanel>
 
-            <section className="create-section">
-              <h3 className="create-section-title">AI selectors</h3>
-              <p className="create-section-hint">
+            <DialogPanel title="AI selectors">
+              <p className="dialog-note">
                 One selector per line. Start with clear when replacing vanilla AI.
               </p>
               <label className="wide">
@@ -552,12 +540,11 @@ export function CreateDialog({
                   placeholder={'clear\nplayers'}
                 />
               </label>
-            </section>
+            </DialogPanel>
 
 
-            <section className="create-section">
-              <h3 className="create-section-title">Equipment</h3>
-              <p className="create-section-hint">MythicMobs item IDs or vanilla material names.</p>
+            <DialogPanel title="Equipment">
+              <p className="dialog-note">MythicMobs item IDs or vanilla material names.</p>
               <datalist id="item-ids">
                 {packIndex.itemIds.map((id) => <option key={id} value={id} />)}
               </datalist>
@@ -581,15 +568,14 @@ export function CreateDialog({
                   ))}
                 </div>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {kind === 'item' && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Identity</h3>
-              <div className="create-section-body">
+          <DialogBody className="dialog-create-body">
+            <DialogPanel title="Identity">
+              <div className="dialog-fields">
                 <label>
                   ID
                   <input
@@ -621,15 +607,14 @@ export function CreateDialog({
                   <input value={item.rarity} onChange={(e) => setItem({ ...item, rarity: e.target.value })} placeholder="COMMON" />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {kind === 'skill' && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Identity</h3>
-              <div className="create-section-body">
+          <DialogBody className="dialog-create-body">
+            <DialogPanel title="Identity">
+              <div className="dialog-fields">
                 <label>
                   ID
                   <input
@@ -661,11 +646,10 @@ export function CreateDialog({
                   />
                 </label>
               </div>
-            </section>
+            </DialogPanel>
 
-            <section className="create-section create-section-skills">
-              <div className="create-section-head">
-                <h3 className="create-section-title">Skill lines</h3>
+            <DialogPanel title="Skill lines" className="dialog-panel-skills">
+              <div className="dialog-panel-toolbar">
                 <button
                   type="button"
                   className={`slb-open-btn${builderOpen && builderContext?.source === 'skill' ? ' active' : ''}`}
@@ -675,7 +659,7 @@ export function CreateDialog({
                   {builderOpen && builderContext?.source === 'skill' ? 'Hide builder' : 'Build line'}
                 </button>
               </div>
-              <p className="create-section-hint">One skill line per row. Use Build line for mechanic and targeter step by step.</p>
+              <p className="dialog-note">One skill line per row. Use Build line for mechanic and targeter step by step.</p>
               <textarea
                 ref={skillsTextareaRef}
                 rows={5}
@@ -697,15 +681,14 @@ export function CreateDialog({
                   onApplyPresetPack={applyPresetPack}
                 />
               )}
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {kind === 'droptable' && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Drop table</h3>
-              <div className="create-section-body">
+          <DialogBody className="dialog-create-body">
+            <DialogPanel title="Drop table">
+              <div className="dialog-fields">
                 <label className="wide">
                   ID
                   <input
@@ -821,15 +804,14 @@ export function CreateDialog({
                   ))}
                 </div>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {kind === 'randomspawn' && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Spawn rule</h3>
-              <div className="create-section-body">
+          <DialogBody className="dialog-create-body">
+            <DialogPanel title="Spawn rule">
+              <div className="dialog-fields">
                 <label>
                   ID
                   <input
@@ -889,13 +871,12 @@ export function CreateDialog({
                   <textarea rows={3} value={spawn.conditions} onChange={(e) => setSpawn({ ...spawn, conditions: e.target.value })} />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
-        <footer className="create-footer">
-          <div className="create-target">
-            <span className="create-target-label">Destination</span>
+        <DialogPanel title="Destination">
+          <div className="dialog-destination">
             <div className="segmented-control" role="group" aria-label="Destination">
               <button
                 type="button"
@@ -918,7 +899,7 @@ export function CreateDialog({
             </div>
 
             {targetMode === 'existing' ? (
-              <label className="create-target-field">
+              <label className="dialog-field">
                 Add to file
                 <select
                   value={targetPath}
@@ -937,7 +918,7 @@ export function CreateDialog({
                 </select>
               </label>
             ) : (
-              <label className="create-target-field">
+              <label className="dialog-field">
                 File name
                 <input
                   value={newFileName}
@@ -948,7 +929,7 @@ export function CreateDialog({
                   placeholder="skeletons.yml"
                   aria-label="New YAML file name"
                 />
-                <span className="create-target-hint">
+                <span className="dialog-note">
                   Creates {resolvedNewPath}
                   {newPathAlreadyExists
                     ? '. That path already exists. Pick another name, or use Existing file.'
@@ -957,31 +938,27 @@ export function CreateDialog({
               </label>
             )}
           </div>
+        </DialogPanel>
 
-          <details className="create-preview-details">
-            <summary>YAML preview</summary>
-            <pre className="dialog-preview">{yaml}</pre>
-          </details>
+        <DialogPreviewBlock code={yaml} />
 
-          <div className="dialog-actions">
-            <button type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="primary"
-              onClick={() => onInsert(effectiveTargetPath, yaml)}
-              disabled={
-                !effectiveTargetPath ||
-                (targetMode === 'new' && newPathAlreadyExists) ||
-                (targetMode === 'existing' && !targetPath)
-              }
-            >
-              {targetMode === 'new' ? 'Create file' : 'Add to file'}
-            </button>
-          </div>
-        </footer>
-      </div>
-    </div>
+        <DialogFooter>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => onInsert(effectiveTargetPath, yaml)}
+            disabled={
+              !effectiveTargetPath ||
+              (targetMode === 'new' && newPathAlreadyExists) ||
+              (targetMode === 'existing' && !targetPath)
+            }
+          >
+            {targetMode === 'new' ? 'Create file' : 'Add to file'}
+          </button>
+        </DialogFooter>
+    </DialogShell>
   )
 }

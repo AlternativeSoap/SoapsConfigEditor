@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AcPrefs, SavePrefs, ThemeMode } from '../types'
 import type { MythicAddons } from '../core/workspaces/mythicAddons'
 import { Switch } from './Switch'
+import { DialogFooter, DialogHeader, DialogShell } from './DialogShell'
 
 interface SettingsMenuProps {
   theme: ThemeMode
@@ -106,15 +107,13 @@ export function SettingsMenu({
         {iconOnly ? '⚙' : 'Settings'}
       </button>
       {open ? (
-        <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-          <div
-            className="dialog dialog-settings"
-            role="dialog"
-            aria-labelledby="settings-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="settings-title">Settings</h2>
-            <p>These apply to this editor on this computer.</p>
+        <DialogShell className="dialog-settings" labelledBy="settings-title" onClose={onClose}>
+          <DialogHeader
+            title="Settings"
+            titleId="settings-title"
+            onClose={onClose}
+            lead="These apply to this editor on this computer."
+          />
 
             {/* ── Theme ── */}
             <div className="settings-section">
@@ -336,13 +335,12 @@ export function SettingsMenu({
               )}
             </div>
 
-            <div className="dialog-actions">
+            <DialogFooter>
               <button type="button" className="primary" onClick={onClose}>
                 Done
               </button>
-            </div>
-          </div>
-        </div>
+            </DialogFooter>
+        </DialogShell>
       ) : null}
     </>
   )

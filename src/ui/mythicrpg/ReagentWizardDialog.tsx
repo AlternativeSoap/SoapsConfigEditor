@@ -11,6 +11,7 @@ import { REAGENT_PRESETS } from '../../data/mythicrpg/presets'
 import type { FileRecord, ReagentGeneratorInput } from '../../types'
 import { ColorTextField } from '../ColorTextField'
 import { Switch } from '../Switch'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
 const STEPS = ['Identity', 'Range', 'Bar'] as const
 
@@ -84,14 +85,6 @@ export function ReagentWizardDialog({
     setTargetPath(reagentFiles[0]?.path ?? suggestReagentPath(packRoot))
   }, [reagentFiles, packRoot])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const yaml = useMemo(() => generateReagentYaml(input), [input])
 
   function patch(partial: Partial<ReagentGeneratorInput>): void {
@@ -153,22 +146,13 @@ export function ReagentWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg class-wizard"
-        role="dialog"
-        aria-labelledby="reagent-wizard-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <div>
-            <h2 id="reagent-wizard-title">New reagent</h2>
-            <p className="wz-step-hint">{STEP_HINTS[step]}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+    <DialogShell size="xl" className="class-wizard" labelledBy="reagent-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title="New reagent"
+        titleId="reagent-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <nav className="wizard-steps" aria-label="Steps">
           {STEPS.map((label, i) => (
@@ -187,9 +171,9 @@ export function ReagentWizardDialog({
           ))}
         </nav>
 
-        <div className="wizard-body">
+        <DialogBody className="wizard-body">
           {step === 0 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Identity">
               <div className="wz-preset-row">
                 <span className="wz-field-label">Presets</span>
                 {REAGENT_PRESETS.map((preset) => (
@@ -235,11 +219,11 @@ export function ReagentWizardDialog({
                 value={input.display}
                 onChange={(display) => patch({ display })}
               />
-            </div>
+            </DialogPanel>
           )}
 
           {step === 1 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Range">
               <div className="wz-toggle">
                 <span className="wz-toggle-copy">
                   <span className="wz-toggle-title">Scale max with MAX_MANA stat</span>
@@ -287,11 +271,11 @@ export function ReagentWizardDialog({
                   />
                 </label>
               ) : null}
-            </div>
+            </DialogPanel>
           )}
 
           {step === 2 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Bar">
               <div className="wz-toggle">
                 <span className="wz-toggle-copy">
                   <span className="wz-toggle-title">Resource bar</span>
@@ -319,18 +303,15 @@ export function ReagentWizardDialog({
                   )}
                 </select>
               </label>
-            </div>
+            </DialogPanel>
           )}
-        </div>
+        </DialogBody>
 
         {error ? <p className="wz-step-error">{error}</p> : null}
 
-        <details className="create-preview-details">
-          <summary>YAML preview</summary>
-          <pre className="dialog-preview">{yaml}</pre>
-        </details>
+        <DialogPreviewBlock code={yaml} />
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>
             Cancel
           </button>
@@ -348,8 +329,7 @@ export function ReagentWizardDialog({
               Create reagent
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

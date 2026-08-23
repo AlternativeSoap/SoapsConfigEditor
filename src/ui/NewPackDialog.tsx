@@ -1,20 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
+import type { MythicAddons } from '../core/workspaces/mythicAddons'
 import type { SavePrefs, WorkspaceKind } from '../types'
 import { DEFAULT_SAVE_PREFS } from '../types'
 import { getWorkspace } from '../core/workspaces/profiles'
-import { Switch } from './Switch'
+import {
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogOption,
+  DialogOptionGrid,
+  DialogPanel,
+  DialogShell,
+  DialogSwitchRow,
+} from './DialogShell'
 
 export interface NewPackStartOptions {
   packName: string
   saveTarget: 'browser' | 'folder'
   autoSave: boolean
   autoSaveInterval: number
+  includeExamples?: boolean
 }
 
 interface NewPackDialogProps {
   workspaceId: WorkspaceKind
   savePrefs?: SavePrefs
   folderPickerAvailable: boolean
+  mythicAddons?: MythicAddons
   onClose: () => void
   onConfirm: (options: NewPackStartOptions) => void
 }
@@ -27,9 +39,12 @@ const AUTOSAVE_INTERVALS: { value: number; label: string }[] = [
   { value: 300, label: '5m' },
 ]
 
-function leadCopy(workspaceId: WorkspaceKind): string {
+function leadCopy(workspaceId: WorkspaceKind, includeExamples: boolean): string {
   if (workspaceId === 'mythicmobs') {
-    return 'Creates MythicMobs/Packs/{name}/ with starter Mobs, Items, Skills, and related files. Save into your plugins folder so paths match the server. If MythicRPG is enabled, archetype and reagent starters are included. If Crucible is enabled, equipment set and augment starters are included.'
+    if (includeExamples) {
+      return 'Creates MythicMobs/Packs/{name}/ with a linked Galebound example pack: mobs, skills, loot, and items that reference each other. MythicRPG and Crucible add-ons in Settings add more linked files when those add-ons are enabled.'
+    }
+    return 'Creates MythicMobs/Packs/{name}/ with empty Mobs, Items, Skills, and related folders. Turn on linked examples below for a small starter pack you can run on a server. Save into your plugins folder so paths match the server.'
   }
   if (workspaceId === 'mmocore') {
     return 'Creates MMOCore/, MythicLib/, and MythicMobs/Packs/ starters as sibling folders. Save into your plugins folder so each tree lands in the matching plugin directory.'
@@ -46,10 +61,18 @@ function leadCopy(workspaceId: WorkspaceKind): string {
   return 'Creates starter YAML for this plugin.'
 }
 
+function exampleAddonSummary(addons: MythicAddons): string {
+  const parts: string[] = ['MythicMobs core']
+  if (addons.mythicrpg) parts.push('MythicRPG spells and archetypes')
+  if (addons.crucible) parts.push('Crucible sets and gear')
+  return parts.join(', ')
+}
+
 export function NewPackDialog({
   workspaceId,
   savePrefs = DEFAULT_SAVE_PREFS,
   folderPickerAvailable,
+  mythicAddons,
   onClose,
   onConfirm,
 }: NewPackDialogProps) {
@@ -61,6 +84,7 @@ export function NewPackDialog({
   )
   const [autoSave, setAutoSave] = useState(savePrefs.autoSave)
   const [autoSaveInterval, setAutoSaveInterval] = useState(savePrefs.autoSaveInterval)
+  const [includeExamples, setIncludeExamples] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -74,14 +98,6 @@ export function NewPackDialog({
     }
   }, [folderPickerAvailable, saveTarget])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const nameOk = Boolean(packName.trim())
   const canCreate = nameOk && (saveTarget === 'browser' || folderPickerAvailable)
   const confirmLabel = workspace?.confirmLabel ?? 'Create files'
@@ -93,23 +109,37 @@ export function NewPackDialog({
       saveTarget,
       autoSave,
       autoSaveInterval,
+      includeExamples: workspaceId === 'mythicmobs' ? includeExamples : undefined,
     })
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-new-pack"
-        role="dialog"
-        aria-labelledby="new-pack-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="new-pack-header">
-          <h2 id="new-pack-title">{workspace?.startDialogTitle ?? 'Start new files'}</h2>
-          <p className="new-pack-lead">{leadCopy(workspaceId)}</p>
-        </header>
+    <DialogShell className="dialog-pack" labelledBy="new-pack-title" onClose={onClose}>
+      <DialogHeader
+        title={workspace?.startDialogTitle ?? 'Start new files'}
+        titleId="new-pack-title"
+        onClose={onClose}
+        lead={leadCopy(workspaceId, includeExamples)}
+      />
 
-        <label className="new-pack-name">
+      <DialogBody>
+        {workspaceId === 'mythicmobs' ? (
+          <DialogPanel>
+            <DialogSwitchRow
+              title="Include linked examples"
+              hint={
+                mythicAddons && includeExamples
+                  ? `Adds the Galebound Covenant starter pack with cross-linked mobs, skills, loot, and items. Includes: ${exampleAddonSummary(mythicAddons)}.`
+                  : 'Adds the Galebound Covenant starter pack with cross-linked mobs, skills, loot, and items. MythicRPG and Crucible content follows your Settings add-ons.'
+              }
+              checked={includeExamples}
+              onChange={setIncludeExamples}
+              ariaLabel="Include linked examples"
+            />
+          </DialogPanel>
+        ) : null}
+
+        <label className="dialog-name-field">
           {workspace?.nameFieldLabel ?? 'Name'}
           <input
             ref={inputRef}
@@ -126,100 +156,65 @@ export function NewPackDialog({
           />
         </label>
 
-        <div className="new-pack-panel">
-          <section className="new-pack-block">
-            <h3 className="new-pack-section-title">Where to save</h3>
-            <div className="new-pack-save-actions" role="radiogroup" aria-label="Where to save">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={saveTarget === 'browser'}
-                className={`new-pack-save-btn${saveTarget === 'browser' ? ' selected' : ''}`}
-                onClick={() => setSaveTarget('browser')}
-              >
-                <span className="new-pack-save-btn-title">Save in browser</span>
-                <span className="new-pack-save-btn-desc">
-                  Stays on this computer until you clear site data.
-                </span>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={saveTarget === 'folder'}
-                className={`new-pack-save-btn${saveTarget === 'folder' ? ' selected' : ''}`}
-                disabled={!folderPickerAvailable}
-                title={
-                  folderPickerAvailable
-                    ? undefined
-                    : 'Folder saving needs Chrome, Edge, or Brave'
-                }
-                onClick={() => setSaveTarget('folder')}
-              >
-                <span className="new-pack-save-btn-title">Save to folder</span>
-                <span className="new-pack-save-btn-desc">
-                  {folderPickerAvailable
-                    ? 'Writes YAML you can copy to your server.'
-                    : 'Not available in this browser. Use Save in browser instead.'}
-                </span>
-              </button>
+        <DialogPanel title="Where to save">
+          <DialogOptionGrid label="Where to save">
+            <DialogOption
+              selected={saveTarget === 'browser'}
+              title="Save in browser"
+              description="Stays on this computer until you clear site data. Export ZIP when you want the files on disk."
+              onClick={() => setSaveTarget('browser')}
+            />
+            <DialogOption
+              selected={saveTarget === 'folder'}
+              title="Save to folder"
+              description={
+                folderPickerAvailable
+                  ? 'Writes files directly into a folder you choose. Best for server plugin directories.'
+                  : 'Folder access is not available in this browser. Use Save in browser or open in Chrome, Edge, or Brave.'
+              }
+              disabled={!folderPickerAvailable}
+              onClick={() => setSaveTarget('folder')}
+            />
+          </DialogOptionGrid>
+        </DialogPanel>
+
+        <DialogPanel title="Auto-save">
+          <DialogSwitchRow
+            title="Auto-save"
+            hint={
+              autoSave
+                ? 'Changed files save on a timer.'
+                : 'You can turn this on later in Settings.'
+            }
+            checked={autoSave}
+            onChange={setAutoSave}
+            ariaLabel="Auto-save"
+          />
+          {autoSave ? (
+            <div className="dialog-chip-row" role="group" aria-label="Auto-save interval">
+              {AUTOSAVE_INTERVALS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`dialog-chip${autoSaveInterval === value ? ' active' : ''}`}
+                  onClick={() => setAutoSaveInterval(value)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          </section>
+          ) : null}
+        </DialogPanel>
+      </DialogBody>
 
-          <section className="new-pack-block new-pack-autosave">
-            <div className="new-pack-switch-row">
-              <div className="new-pack-switch-copy">
-                <h3 className="new-pack-section-title">Auto-save</h3>
-                <p className="new-pack-switch-hint">
-                  {autoSave
-                    ? 'Changed files save on a timer.'
-                    : 'You can turn this on later in Settings.'}
-                </p>
-              </div>
-              <Switch
-                checked={autoSave}
-                onChange={setAutoSave}
-                aria-label="Auto-save"
-              />
-            </div>
-            {autoSave ? (
-              <div className="new-pack-interval-row" role="group" aria-label="Auto-save interval">
-                {AUTOSAVE_INTERVALS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={`new-pack-chip${autoSaveInterval === opt.value ? ' active' : ''}`}
-                    onClick={() => setAutoSaveInterval(opt.value)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </section>
-        </div>
-
-        <p className="new-pack-shortcuts">
-          <kbd>Ctrl</kbd>
-          <kbd>S</kbd>
-          <span>current file</span>
-          <span className="new-pack-shortcuts-sep" aria-hidden="true">
-            ·
-          </span>
-          <kbd>Ctrl</kbd>
-          <kbd>Shift</kbd>
-          <kbd>S</kbd>
-          <span>all changed</span>
-        </p>
-
-        <div className="dialog-actions">
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="primary" disabled={!canCreate} onClick={submit}>
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+      <DialogFooter>
+        <button type="button" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="primary" disabled={!canCreate} onClick={submit}>
+          {confirmLabel}
+        </button>
+      </DialogFooter>
+    </DialogShell>
   )
 }

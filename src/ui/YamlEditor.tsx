@@ -13,6 +13,10 @@ import {
 import { tags as t } from '@lezer/highlight'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { buildMythicAutocomplete } from '../core/mythicmobs/autocomplete'
+import {
+  buildSoapsQuestAutocomplete,
+  type SoapsQuestCatalog,
+} from '../core/soapsquest/autocomplete'
 import { resolveMythicCatalogs } from '../core/mythicmobs/resolveCatalogs'
 import type { MechanicAttr } from '../data/mythicmobs/mechanics'
 import {
@@ -31,6 +35,8 @@ export type { SkillLineContext }
 
 export interface YamlEditorHandle {
   insert: (text: string) => void
+  /** Jump to a quest block in quests.yml (`  quest_id:`). */
+  goToQuestBlock: (questId: string) => void
   /** Adds a mechanic (if needed) and inserts an attribute on the current skill line. */
   insertMechanicAttr: (mechanicId: string, attr: MechanicAttr) => void
   /** Inserts an attribute into a targeter's `{…}` block on the current line, or appends the targeter. */
@@ -49,8 +55,12 @@ interface YamlEditorProps {
   acPrefs?: AcPrefs
   /** Active file category — scopes YAML key and list completions. */
   fileCategory?: MythicCategory
+  /** Active file path — enables packinfo.yml completions. */
+  filePath?: string
   /** When true, merges Crucible mechanics/targeters/conditions/triggers into autocomplete. */
   crucibleEnabled?: boolean
+  /** When set on quests.yml, suggests tier, difficulty, quest, and material values. */
+  soapsQuestCatalog?: SoapsQuestCatalog
   onLineContextChange?: (context: SkillLineContext) => void
 }
 
@@ -133,19 +143,24 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
     packIndex,
     acPrefs,
     fileCategory,
+    filePath,
     crucibleEnabled = false,
+    soapsQuestCatalog,
     onLineContextChange,
   }, ref) {
     const parentRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
     const themeRef = useRef(new Compartment())
     const acRef = useRef(new Compartment())
+    const sqAcRef = useRef(new Compartment())
     const onChangeRef = useRef(onChange)
     const onLineContextRef = useRef(onLineContextChange)
     onChangeRef.current = onChange
     onLineContextRef.current = onLineContextChange
     const fileCategoryRef = useRef(fileCategory)
     fileCategoryRef.current = fileCategory
+    const filePathRef = useRef(filePath)
+    filePathRef.current = filePath
     const crucibleRef = useRef(crucibleEnabled)
     crucibleRef.current = crucibleEnabled
 
@@ -166,6 +181,23 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
         })
         view.focus()
         publishLineContext(view)
+      },
+      goToQuestBlock(questId: string) {
+        const view = viewRef.current
+        if (!view || !questId.trim()) return
+        const escaped = questId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const pattern = new RegExp(`^  ${escaped}:\\s*(?:#.*)?$`)
+        for (let i = 1; i <= view.state.doc.lines; i += 1) {
+          const line = view.state.doc.line(i)
+          if (!pattern.test(line.text)) continue
+          view.dispatch({
+            selection: { anchor: line.from },
+            effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+          })
+          view.focus()
+          publishLineContext(view)
+          return
+        }
       },
       insertMechanicAttr(mechanicId: string, attr: MechanicAttr) {
         const view = viewRef.current
@@ -301,8 +333,12 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
                   crucibleRef.current,
                   packIndex.equipmentSetIds,
                   packIndex.augmentTypeIds,
+                  filePathRef.current,
                 )
               : [],
+          ),
+          sqAcRef.current.of(
+            soapsQuestCatalog ? buildSoapsQuestAutocomplete(soapsQuestCatalog) : [],
           ),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
@@ -360,11 +396,22 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
                 crucibleEnabled,
                 packIndex.equipmentSetIds,
                 packIndex.augmentTypeIds,
+                filePath,
               )
             : [],
         ),
       })
-    }, [packIndex, acPrefs, fileCategory, crucibleEnabled])
+    }, [packIndex, acPrefs, fileCategory, crucibleEnabled, filePath])
+
+    useEffect(() => {
+      const view = viewRef.current
+      if (!view) return
+      view.dispatch({
+        effects: sqAcRef.current.reconfigure(
+          soapsQuestCatalog ? buildSoapsQuestAutocomplete(soapsQuestCatalog) : [],
+        ),
+      })
+    }, [soapsQuestCatalog])
 
     return <div className="yaml-editor" ref={parentRef} />
   },

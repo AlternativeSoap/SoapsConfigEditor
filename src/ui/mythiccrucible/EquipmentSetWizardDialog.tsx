@@ -10,6 +10,7 @@ import type { EquipmentSetBonusInput, EquipmentSetGeneratorInput, FileRecord } f
 import { ColorTextField } from '../ColorTextField'
 import { SkillLineBuilder } from '../SkillLineBuilder'
 import { Switch } from '../Switch'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
 const STEPS = ['Identity', 'Bonuses'] as const
 
@@ -85,14 +86,6 @@ export function EquipmentSetWizardDialog({
     setTargetPath(setFiles[0]?.path ?? suggestEquipmentSetPath(packRoot))
   }, [setFiles, packRoot])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const yaml = useMemo(() => generateEquipmentSetYaml(input), [input])
 
   function patch(partial: Partial<EquipmentSetGeneratorInput>): void {
@@ -137,19 +130,13 @@ export function EquipmentSetWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <div
-        className="dialog wizard-dialog"
-        role="dialog"
-        aria-labelledby="equip-set-wizard-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <header className="dialog-header">
-          <h2 id="equip-set-wizard-title">New equipment set</h2>
-          <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </header>
+    <DialogShell size="lg" className="wizard-dialog" labelledBy="equip-set-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title="New equipment set"
+        titleId="equip-set-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <div className="wizard-steps" role="tablist">
           {STEPS.map((label, i) => (
@@ -165,13 +152,11 @@ export function EquipmentSetWizardDialog({
             </button>
           ))}
         </div>
-        <p className="wizard-step-hint">{STEP_HINTS[step]}</p>
 
         {step === 0 && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Identity</h3>
-              <div className="create-section-body">
+          <DialogBody>
+            <DialogPanel title="Identity">
+              <div className="dialog-fields">
                 <label>
                   Preset
                   <select
@@ -218,16 +203,15 @@ export function EquipmentSetWizardDialog({
                   <input value={targetPath} onChange={(e) => setTargetPath(e.target.value)} />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {step === 1 && (
-          <div className="dialog-fields create-sections">
+          <DialogBody>
             {input.bonuses.map((bonus, index) => (
-              <section key={index} className="create-section">
-                <h3 className="create-section-title">Bonus {index + 1}</h3>
-                <div className="create-section-body">
+              <DialogPanel key={index} title={`Bonus ${index + 1}`}>
+                <div className="dialog-fields">
                   <label>
                     Pieces required
                     <input
@@ -274,7 +258,7 @@ export function EquipmentSetWizardDialog({
                     />
                   )}
                 </div>
-              </section>
+              </DialogPanel>
             ))}
             <button
               type="button"
@@ -289,13 +273,13 @@ export function EquipmentSetWizardDialog({
             >
               Add bonus tier
             </button>
-          </div>
+          </DialogBody>
         )}
 
-        <pre className="wizard-preview">{yaml}</pre>
+        <DialogPreviewBlock code={yaml} />
         {error ? <p className="error-copy">{error}</p> : null}
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>Cancel</button>
           {step > 0 ? (
             <button type="button" onClick={() => setStep((s) => s - 1)}>Back</button>
@@ -309,8 +293,7 @@ export function EquipmentSetWizardDialog({
               Create set
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

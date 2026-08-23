@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { RemoveButton } from './RemoveButton'
 import {
   parseSkillLineParts,
   serializeSkillLineParts,
@@ -469,14 +470,11 @@ export function SkillLineBuilder({
                   {c.invert ? '!' : '?'}
                 </button>
                 {c.id}
-                <button
-                  type="button"
-                  className="slb-chip-remove"
-                  onClick={() => removeCondition(c.id)}
+                <RemoveButton
+                  size="sm"
                   aria-label={`Remove ${c.id}`}
-                >
-                  ✕
-                </button>
+                  onClick={() => removeCondition(c.id)}
+                />
               </span>
             ))}
             <div className="slb-cond-add" data-slb-picker>

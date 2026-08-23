@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Switch } from '../Switch'
+import { RemoveButton } from '../RemoveButton'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 import { ATTRIBUTE_CATALOG, normalizeAttributeId, resolveAttributeMeta } from '../../data/mmocore/attributes'
 import { FORMULA_CHIPS, SLOT_BUFF_PRESETS, CLASS_SKILL_TRIGGERS } from '../../data/mmocore/slotBuffs'
 import { COMMON_MATERIALS } from '../../data/mmocore/materials'
@@ -461,14 +463,6 @@ export function ClassWizardDialog({
     return () => window.clearTimeout(timer)
   }, [draftReady, step, input, editingPath, slotsAdvanced, showAdvancedProgression])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   function patch(p: Partial<ClassGeneratorInput>): void {
     setInput((prev) => ({ ...prev, ...p }))
   }
@@ -728,22 +722,13 @@ export function ClassWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg class-wizard"
-        role="dialog"
-        aria-labelledby="class-wizard-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <div>
-            <h2 id="class-wizard-title">{editingPath ? 'Edit class' : 'New class'}</h2>
-            <p className="wz-step-hint">{STEP_HINTS[step]}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+    <DialogShell size="xl" className="class-wizard" labelledBy="class-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title={editingPath ? 'Edit class' : 'New class'}
+        titleId="class-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <nav className="wizard-steps" aria-label="Steps">
           {STEPS.map((label, i) => (
@@ -759,7 +744,7 @@ export function ClassWizardDialog({
           ))}
         </nav>
 
-        <div className="wizard-body">
+        <DialogBody className="wizard-body">
           {step === 0 && (
             <div className="wizard-pane">
               {index.classPaths.length > 0 ? (
@@ -781,6 +766,7 @@ export function ClassWizardDialog({
                 </Field>
               ) : null}
 
+              <DialogPanel title="Presets and identity">
               <div className="wz-preset-row">
                 <span className="wz-field-label">Presets</span>
                 {CLASS_PRESETS.map((preset) => (
@@ -855,25 +841,29 @@ export function ClassWizardDialog({
                 </Field>
               </div>
               {editingPath ? (
-                <p className="wz-card-lead">
+                <p className="dialog-note">
                   Editing <code>{editingPath}</code>
                   {pathClassId(editingPath) !== input.id
                     ? `. The class id changed. Apply will write ${classFilePath(input.id)} and remove the old file.`
                     : null}
                 </p>
               ) : null}
+              </DialogPanel>
+              <DialogPanel title="Flavor lore">
               <ColorTextField
-                label="Flavor lore (class description)"
+                label="Class description"
                 value={input.lore.join('\n')}
                 onChange={(v) => patch({ lore: v.split(/\r?\n/) })}
                 multiline
                 rows={3}
               />
+              </DialogPanel>
             </div>
           )}
 
           {step === 1 && (
             <div className="wizard-pane">
+              <DialogPanel title="Leveling">
               <div className="wz-grid-2">
                 <Field label="Max level" hint="Highest class level players can reach">
                   <input
@@ -904,6 +894,7 @@ export function ClassWizardDialog({
                 title="Create exp curve file if missing"
                 hint="Writes MMOCore/exp-curves/{id}.txt so leveling works without extra setup"
               />
+              </DialogPanel>
 
               <button
                 type="button"
@@ -946,9 +937,8 @@ export function ClassWizardDialog({
                 </>
               ) : null}
 
-              <section className="wz-card">
-                <h3>On every level-up, give…</h3>
-                <p className="wz-card-lead">
+              <DialogPanel title="On every level-up">
+                <p className="dialog-note">
                   These run as admin commands when the player levels this class.
                 </p>
                 <ToggleRow
@@ -975,10 +965,9 @@ export function ClassWizardDialog({
                   title="1 attribute point"
                   hint="Spent in /attributes (Strength, Dexterity, Intelligence). Separate from class player stats."
                 />
-              </section>
+              </DialogPanel>
 
-              <section className="wz-card">
-                <h3>Class options</h3>
+              <DialogPanel title="Class options">
                 <ToggleRow
                   checked={input.options.default}
                   onChange={(v) => patch({ options: { ...input.options, default: v } })}
@@ -1009,16 +998,13 @@ export function ClassWizardDialog({
                   title="Mana only regenerates out of combat"
                   hint="options.off-combat-mana-regen. Applies to flat MANA_REGENERATION from player stats."
                 />
-              </section>
+              </DialogPanel>
 
-              <section className="wz-card">
-                <div className="wz-card-head">
-                  <div>
-                    <h3>XP from killing mobs</h3>
-                    <p className="wz-card-lead">
-                      How this class gains experience. Pick a mob and XP range. No syntax needed.
-                    </p>
-                  </div>
+              <DialogPanel title="XP from killing mobs">
+                <div className="dialog-panel-toolbar">
+                  <p className="dialog-note">
+                    How this class gains experience. Pick a mob and XP range. No syntax needed.
+                  </p>
                   <button
                     type="button"
                     className="wz-link-btn"
@@ -1049,14 +1035,10 @@ export function ClassWizardDialog({
                         row.raw ? (
                           <div key={idx} className="wz-killmob-row">
                             <code className="wz-killmob-raw">{row.raw}</code>
-                            <button
-                              type="button"
-                              className="wz-icon-btn"
-                              title="Remove"
+                            <RemoveButton
+                              aria-label="Remove kill mob entry"
                               onClick={() => setKillmobRows(killmobRows.filter((_, i) => i !== idx))}
-                            >
-                              ×
-                            </button>
+                            />
                           </div>
                         ) : (
                           <div key={idx} className="wz-killmob-row">
@@ -1096,14 +1078,10 @@ export function ClassWizardDialog({
                                 setKillmobRows(next)
                               }}
                             />
-                            <button
-                              type="button"
-                              className="wz-icon-btn"
-                              title="Remove"
+                            <RemoveButton
+                              aria-label="Remove kill mob entry"
                               onClick={() => setKillmobRows(killmobRows.filter((_, i) => i !== idx))}
-                            >
-                              ×
-                            </button>
+                            />
                           </div>
                         ),
                       )}
@@ -1131,15 +1109,14 @@ export function ClassWizardDialog({
                     </div>
                   </>
                 )}
-              </section>
+              </DialogPanel>
             </div>
           )}
 
           {step === 2 && (
             <div className="wizard-pane">
-              <section className="wz-card">
-                <h3>Resource bar branding</h3>
-                <p className="wz-card-lead">
+              <DialogPanel title="Resource bar branding">
+                <p className="dialog-note">
                   Rename “mana” for this class (for example Ember, Rage, or Focus). Shown on the action bar.
                 </p>
                 <div className="wz-grid-3">
@@ -1201,11 +1178,10 @@ export function ClassWizardDialog({
                     </select>
                   </Field>
                 </div>
-              </section>
+              </DialogPanel>
 
-              <section className="wz-card">
-                <h3>Resource bar refill</h3>
-                <p className="wz-card-lead">
+              <DialogPanel title="Resource bar refill">
+                <p className="dialog-note">
                   Percent of max health / {input.mana.name || 'mana'} restored per second (the{' '}
                   <code>resource:</code> block). Flat pts/sec regen is set under Player stats
                   (HEALTH_REGENERATION, MANA_REGENERATION).
@@ -1268,9 +1244,9 @@ export function ClassWizardDialog({
                   title={`${input.mana.name || 'Mana'} % refill only out of combat`}
                   hint="resource.mana.off-combat"
                 />
-              </section>
+              </DialogPanel>
 
-              <section className="wz-card">
+              <DialogPanel title="Casting particles">
                 <ToggleRow
                   checked={input.castParticle.enabled}
                   onChange={(v) =>
@@ -1384,9 +1360,9 @@ export function ClassWizardDialog({
                     ) : null}
                   </div>
                 ) : null}
-              </section>
+              </DialogPanel>
 
-              <section className="wz-card">
+              <DialogPanel title="Key combos">
                 <ToggleRow
                   checked={Object.keys(input.keyCombos ?? {}).length > 0}
                   onChange={(v) => {
@@ -1406,7 +1382,7 @@ export function ClassWizardDialog({
                 />
                 {Object.keys(input.keyCombos ?? {}).length > 0 ? (
                   <div style={{ marginTop: '0.5rem' }}>
-                    <p className="wz-card-lead">
+                    <p className="dialog-note">
                       Map slot numbers to click sequences. Leave empty to omit key-combos from the
                       class file.
                     </p>
@@ -1427,17 +1403,14 @@ export function ClassWizardDialog({
                           }}
                           placeholder="LEFT_CLICK, RIGHT_CLICK"
                         />
-                        <button
-                          type="button"
-                          className="wz-icon-btn"
+                        <RemoveButton
+                          aria-label="Remove key combo"
                           onClick={() => {
                             const next = { ...input.keyCombos }
                             delete next[slot]
                             patch({ keyCombos: next })
                           }}
-                        >
-                          ×
-                        </button>
+                        />
                       </div>
                     ))}
                     <div className="attr-picker">
@@ -1466,13 +1439,14 @@ export function ClassWizardDialog({
                     </button>
                   </div>
                 ) : null}
-              </section>
+              </DialogPanel>
             </div>
           )}
 
           {step === 3 && (
             <div className="wizard-pane">
-              <p className="wz-card-lead">
+              <DialogPanel title="Player stats">
+              <p className="dialog-note">
                 These are MythicLib player stats granted by the class (health, damage, crit, and so
                 on). They are not the Strength / Dexterity / Intelligence points from{' '}
                 <code>/attributes</code>. Stats scale as <code>base + level × per-level</code>. Toggle
@@ -1617,35 +1591,32 @@ export function ClassWizardDialog({
                           aria-label={`Show ${attr.id} in class lore`}
                         />
                       </div>
-                      <button
-                        type="button"
-                        className="wz-icon-btn"
-                        title="Remove"
+                      <RemoveButton
+                        aria-label={`Remove ${attr.id}`}
                         onClick={() =>
                           patch({ attributes: input.attributes.filter((_, i) => i !== idx) })
                         }
-                      >
-                        ×
-                      </button>
+                      />
                     </div>
                   )
                 })}
               </div>
+              </DialogPanel>
             </div>
           )}
 
           {step === 4 && (
             <div className="wizard-pane">
-              <p className="wz-card-lead">
-                Class skills must be registered in MythicLib. Active skills need a skill slot to
-                cast. Passive skills use a trigger (for example ATTACK or TIMER). Set “Must be bound”
-                off when a passive should always apply without binding.
-              </p>
-              <div className="wz-actions-row">
-                <button type="button" className="primary" onClick={() => setNewSkillOpen(true)}>
-                  Create new skill…
+              <DialogPanel title="Add skills">
+                <p className="dialog-note">
+                  Class skills must be registered in MythicLib. Active skills need a skill slot to
+                  cast. Passive skills use a trigger (for example ATTACK or TIMER). Turn off “Must
+                  be bound” when a passive should always apply without binding.
+                </p>
+                <button type="button" className="dialog-add-btn" onClick={() => setNewSkillOpen(true)}>
+                  Create new skill
                 </button>
-                <Field label="Or attach existing">
+                <Field label="Attach existing" wide>
                   <select
                     defaultValue=""
                     onChange={(e) => {
@@ -1661,70 +1632,76 @@ export function ClassWizardDialog({
                     ))}
                   </select>
                 </Field>
-              </div>
-              <ToggleRow
-                checked={input.includeAttackSkills}
-                onChange={(v) => patch({ includeAttackSkills: v })}
-                title="Include regular + critical attack skills"
-                hint="Binds prefix_regular_attack and prefix_critical_strike on the class"
-              />
-              {input.includeAttackSkills ? (
-                <>
-                  <Field label="Attack id prefix" hint="Becomes prefix_regular_attack">
-                    <input
-                      value={input.attackSkillPrefix}
-                      onChange={(e) => patch({ attackSkillPrefix: e.target.value })}
-                    />
-                  </Field>
-                  <ToggleRow
-                    checked={input.syncElementRow}
-                    onChange={(v) => patch({ syncElementRow: v })}
-                    title="Update MythicLib/elements.yml"
-                    hint="Writes the element row and optional attack_skills.yml stubs. Script bodies stay manual."
-                  />
-                  <p className="wz-card-lead">
-                    After creating the class, polish MythicMobs mechanics and point any MythicLib
-                    scripts at these attack skill ids.
-                  </p>
-                </>
-              ) : null}
+              </DialogPanel>
 
-              <Field label="Attach built-in Phoenix skill" hint="Read-only list of common stock skill ids">
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value) attachExistingSkill(e.target.value)
-                    e.target.value = ''
-                  }}
+              <DialogPanel title="Attack skills">
+                <ToggleRow
+                  checked={input.includeAttackSkills}
+                  onChange={(v) => patch({ includeAttackSkills: v })}
+                  title="Include regular + critical attack skills"
+                  hint="Binds prefix_regular_attack and prefix_critical_strike on the class"
+                />
+                {input.includeAttackSkills ? (
+                  <>
+                    <Field label="Attack id prefix" hint="Becomes prefix_regular_attack">
+                      <input
+                        value={input.attackSkillPrefix}
+                        onChange={(e) => patch({ attackSkillPrefix: e.target.value })}
+                      />
+                    </Field>
+                    <ToggleRow
+                      checked={input.syncElementRow}
+                      onChange={(v) => patch({ syncElementRow: v })}
+                      title="Update MythicLib/elements.yml"
+                      hint="Writes the element row and optional attack_skills.yml stubs. Script bodies stay manual."
+                    />
+                    <p className="dialog-note">
+                      After creating the class, polish MythicMobs mechanics and point any MythicLib
+                      scripts at these attack skill ids.
+                    </p>
+                  </>
+                ) : null}
+              </DialogPanel>
+
+              <DialogPanel title="Built-in skills">
+                <Field
+                  label="Attach built-in Phoenix skill"
+                  hint="Read-only list of common stock skill ids"
+                  wide
                 >
-                  <option value="">Select built-in skill…</option>
-                  {BUILTIN_SKILL_IDS.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.id})
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) attachExistingSkill(e.target.value)
+                      e.target.value = ''
+                    }}
+                  >
+                    <option value="">Select built-in skill…</option>
+                    {BUILTIN_SKILL_IDS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.id})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </DialogPanel>
 
               {input.skills.length === 0 ? (
                 <p className="wz-empty">No skills yet. Create or attach one above.</p>
               ) : null}
 
               {input.skills.map((skill, idx) => (
-                <div key={skill.id} className="skill-card">
-                  <div className="wz-card-head">
-                    <div>
-                      <strong>{skill.displayName}</strong>{' '}
+                <article key={skill.id} className="dialog-card">
+                  <div className="dialog-card-head">
+                    <strong>
+                      {skill.displayName}{' '}
                       <code>{skill.id}</code>
                       {skill.isNew ? <span className="wz-badge">new</span> : null}
-                    </div>
-                    <button
-                      type="button"
-                      className="wz-icon-btn"
+                    </strong>
+                    <RemoveButton
+                      aria-label={`Remove ${skill.displayName}`}
                       onClick={() => patch({ skills: input.skills.filter((_, i) => i !== idx) })}
-                    >
-                      ×
-                    </button>
+                    />
                   </div>
                   <div className="wz-grid-3">
                     <Field label="Unlock at class level" hint="Natural unlock level for this class">
@@ -1807,7 +1784,7 @@ export function ClassWizardDialog({
                     fields={['base', 'perLevel', 'min']}
                     onChange={(cooldown) => updateSkill(idx, { cooldown })}
                   />
-                  <p className="wz-card-lead">
+                  <p className="dialog-note">
                     Skill modifiers scale with skill level (upgrades), not class level.
                   </p>
                   {Object.entries(skill.modifiers).map(([key, mod]) => (
@@ -1836,18 +1813,14 @@ export function ClassWizardDialog({
                           />
                         </label>
                       ))}
-                      <button
-                        type="button"
-                        className="wz-icon-btn"
-                        title="Remove modifier"
+                      <RemoveButton
+                        aria-label={`Remove ${key} modifier`}
                         onClick={() => {
                           const next = { ...skill.modifiers }
                           delete next[key]
                           updateSkill(idx, { modifiers: next })
                         }}
-                      >
-                        ×
-                      </button>
+                      />
                     </div>
                   ))}
                   <div className="wz-mod-add">
@@ -1935,13 +1908,12 @@ export function ClassWizardDialog({
                       </div>
                     </div>
                   ) : null}
-                </div>
+                </article>
               ))}
 
               {newSkillOpen ? (
-                <div className="nested-dialog">
-                  <h3>New skill stub</h3>
-                  <p className="wz-card-lead">
+                <DialogPanel title="New skill stub">
+                  <p className="dialog-note">
                     Creates MythicLib registration plus a MythicMobs stub with typed elemental
                     mmodamage. Example ids: STORM_BOLT, category STORM.
                   </p>
@@ -2042,7 +2014,7 @@ export function ClassWizardDialog({
                       </datalist>
                     </Field>
                   </div>
-                  <div className="wz-actions-row">
+                  <div className="dialog-actions wz-inline-actions">
                     <button type="button" onClick={() => setNewSkillOpen(false)}>
                       Cancel
                     </button>
@@ -2050,30 +2022,34 @@ export function ClassWizardDialog({
                       Add skill
                     </button>
                   </div>
-                </div>
+                </DialogPanel>
               ) : null}
             </div>
           )}
 
           {step === 5 && (
             <div className="wizard-pane">
+              <DialogPanel title="Skill slots">
               <ToggleRow
                 checked={slotsAdvanced}
                 onChange={setSlotsAdvanced}
                 title="Advanced slot options"
                 hint="Formulas, hardset, buffs, auto lore, and manual bind"
               />
-              <p className="wz-card-lead">
+              <p className="dialog-note">
                 {slotsAdvanced
                   ? 'Each slot is a skill keybind. Formulas limit which skills fit (for example only <ACTIVE> or a category like <FIRE>). Buffs apply to the skill bound to that slot. Use hardset to force one skill for everyone.'
                   : 'Name each skill slot and choose whether it starts available. Switch to Advanced for formulas and buffs.'}
               </p>
+              </DialogPanel>
               {input.slots.map((slot, idx) => (
-                <div key={slot.index} className="skill-card">
-                  <strong>
-                    Slot {slot.index}
-                    {slot.name ? `: ${slot.name}` : ''}
-                  </strong>
+                <article key={slot.index} className="dialog-card">
+                  <div className="dialog-card-head">
+                    <strong>
+                      Slot {slot.index}
+                      {slot.name ? `: ${slot.name}` : ''}
+                    </strong>
+                  </div>
                   <Field label="Display name">
                     <input
                       value={slot.name}
@@ -2219,32 +2195,29 @@ export function ClassWizardDialog({
                             <option value="RELATIVE">% relative</option>
                             <option value="FLAT">flat</option>
                           </select>
-                          <button
-                            type="button"
-                            className="wz-icon-btn"
+                          <RemoveButton
+                            aria-label="Remove buff"
                             onClick={() =>
                               updateSlot(idx, { buffs: slot.buffs.filter((_, i) => i !== bi) })
                             }
-                          >
-                            ×
-                          </button>
+                          />
                         </div>
                       ))}
                     </>
                   ) : null}
-                </div>
+                </article>
               ))}
             </div>
           )}
 
           {step === 6 && (
             <div className="wizard-pane">
-              <p className="wz-card-lead">
+              <DialogPanel title="Class menu lore">
+              <p className="dialog-note">
                 This is only visual text in the class select menu. It does not change real stats.
                 Auto mode keeps it in sync with Player stats and Skills.
               </p>
-              <section className="wz-card">
-                <h3>How to build lore</h3>
+                <h3 className="dialog-section-title">How to build lore</h3>
                 {(
                   [
                     ['auto', 'Automatic', 'Rebuilds when you change stats or skills'],
@@ -2265,7 +2238,6 @@ export function ClassWizardDialog({
                     </span>
                   </label>
                 ))}
-              </section>
               <ToggleRow
                 checked={input.includeAttackSkillsInLore}
                 onChange={(v) => patch({ includeAttackSkillsInLore: v })}
@@ -2292,13 +2264,13 @@ export function ClassWizardDialog({
                   />
                 </Field>
               ) : null}
+              </DialogPanel>
             </div>
           )}
 
           {step === 7 && (
             <div className="wizard-pane">
-              <section className="wz-card">
-                <h3>Checks</h3>
+              <DialogPanel title="Checks">
                 {preflight.length === 0 ? (
                   <p className="wz-ok">Ready to create. No issues found.</p>
                 ) : (
@@ -2311,9 +2283,8 @@ export function ClassWizardDialog({
                     ))}
                   </ul>
                 )}
-              </section>
-              <section className="wz-card">
-                <h3>Files to write</h3>
+              </DialogPanel>
+              <DialogPanel title="Files to write">
                 <ul className="wz-file-list">
                   {plannedFiles.map((f) => (
                     <li key={`${f.mode}:${f.path}`}>
@@ -2324,14 +2295,13 @@ export function ClassWizardDialog({
                     </li>
                   ))}
                 </ul>
-              </section>
-              <h3>YAML preview</h3>
-              <pre className="dialog-preview wz-yaml-preview">{previewYaml}</pre>
+              </DialogPanel>
+              <DialogPreviewBlock title="YAML preview" code={previewYaml} />
             </div>
           )}
-        </div>
+        </DialogBody>
 
-        <div className="dialog-actions wizard-footer">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>
             Cancel
           </button>
@@ -2360,8 +2330,7 @@ export function ClassWizardDialog({
               </button>
             )}
           </div>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

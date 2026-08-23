@@ -108,7 +108,7 @@ export const ARCHETYPE_PRESETS: NamedPreset<ArchetypeGeneratorInput>[] = [
       maxLevel: 50,
       experienceCurve: 'STANDARD',
       experienceSource: 'SPELLCASTING',
-      spellUnlocks: 'MagicMissile',
+      spellUnlocks: 'MAGIC_MISSILE',
       baseStatLine: "MAX_MANA '50 + 5*L'",
       statModifierLine: '',
     }),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   generateElementsYaml,
   parseElementsYaml,
@@ -6,6 +6,14 @@ import {
 } from '../../core/mmocore/elements'
 import { DEFAULT_ELEMENT_IDS } from '../../data/mmocore/triggers'
 import type { FileRecord } from '../../types'
+import {
+  DialogAddButton,
+  DialogBody,
+  DialogCard,
+  DialogFooter,
+  DialogHeader,
+  DialogShell,
+} from '../DialogShell'
 
 interface ElementsEditorDialogProps {
   files: FileRecord[]
@@ -30,14 +38,6 @@ export function ElementsEditorDialog({ files, onClose, onApply }: ElementsEditor
     parseElementsYaml(existing?.content ?? ''),
   )
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   function updateRow(idx: number, patch: Partial<MythicLibElementRow>): void {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
   }
@@ -53,39 +53,25 @@ export function ElementsEditorDialog({ files, onClose, onApply }: ElementsEditor
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg"
-        role="dialog"
-        aria-labelledby="elements-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <h2 id="elements-title">MythicLib elements</h2>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        <div className="dialog-fields">
-          <p>
-            Register elemental damage types and wire their regular-attack / crit-strike skill ids.
-            Script bodies for those skills stay in MythicLib YAML.
-          </p>
-          {rows.length === 0 ? (
-            <p className="wz-empty">No elements yet. Add a row to begin.</p>
-          ) : null}
-          {rows.map((row, idx) => (
-            <div key={idx} className="skill-card">
-              <div className="wz-card-head">
-                <strong>{row.id || 'New element'}</strong>
-                <button
-                  type="button"
-                  className="wz-icon-btn"
-                  onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
-                >
-                  ×
-                </button>
-              </div>
+    <DialogShell size="lg" labelledBy="elements-title" onClose={onClose}>
+      <DialogHeader
+        title="MythicLib elements"
+        titleId="elements-title"
+        onClose={onClose}
+        lead="Register elemental damage types and wire their regular-attack and crit-strike skill ids. Script bodies stay in MythicLib YAML."
+      />
+
+      <DialogBody>
+        {rows.length === 0 ? (
+          <p className="wz-empty">No elements yet. Add one below.</p>
+        ) : (
+          rows.map((row, idx) => (
+            <DialogCard
+              key={idx}
+              title={row.id || `Element ${idx + 1}`}
+              removeLabel={`Remove ${row.id || `element ${idx + 1}`}`}
+              onRemove={() => setRows((prev) => prev.filter((_, i) => i !== idx))}
+            >
               <div className="wz-grid-2">
                 <label>
                   Id
@@ -132,7 +118,7 @@ export function ElementsEditorDialog({ files, onClose, onApply }: ElementsEditor
                     placeholder="storm_regular_attack"
                   />
                 </label>
-                <label>
+                <label className="wide">
                   Critical strike skill id
                   <input
                     value={row.critStrikeId}
@@ -141,26 +127,27 @@ export function ElementsEditorDialog({ files, onClose, onApply }: ElementsEditor
                   />
                 </label>
               </div>
-            </div>
+            </DialogCard>
+          ))
+        )}
+        <datalist id="element-id-suggestions">
+          {DEFAULT_ELEMENT_IDS.map((el) => (
+            <option key={el} value={el} />
           ))}
-          <datalist id="element-id-suggestions">
-            {DEFAULT_ELEMENT_IDS.map((el) => (
-              <option key={el} value={el} />
-            ))}
-          </datalist>
-          <button type="button" className="chip" onClick={() => setRows((prev) => [...prev, EMPTY_ROW()])}>
-            Add element
-          </button>
-        </div>
-        <div className="dialog-actions">
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="primary" onClick={submit}>
-            Save elements.yml
-          </button>
-        </div>
-      </div>
-    </div>
+        </datalist>
+        <DialogAddButton onClick={() => setRows((prev) => [...prev, EMPTY_ROW()])}>
+          Add element
+        </DialogAddButton>
+      </DialogBody>
+
+      <DialogFooter>
+        <button type="button" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="primary" onClick={submit}>
+          Save elements.yml
+        </button>
+      </DialogFooter>
+    </DialogShell>
   )
 }

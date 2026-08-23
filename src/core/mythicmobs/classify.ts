@@ -26,6 +26,9 @@ export function classifyMythicCategory(filePath: string): MythicCategory {
   if (baseName === 'stats.yml' || baseName.endsWith('.stat.yml')) {
     return 'other'
   }
+  if (baseName === 'packinfo.yml' || baseName.startsWith('packinfo.')) {
+    return 'packinfo'
+  }
 
   const segments = normalized.split('/').filter(Boolean)
   for (const segment of segments) {

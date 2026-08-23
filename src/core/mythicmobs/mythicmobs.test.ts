@@ -1,15 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { classifyMythicCategory, detectPackName } from './classify'
-import { generateItemYaml, generateMobYaml } from './generators'
+import { formatSkillsYamlBlock, generateItemYaml, generateMobYaml } from './generators'
 import { validateMobSkillReferences } from './validate'
 import type { FileRecord } from '../../types'
 
 describe('mythicmobs helpers', () => {
+  it('formats multiline skill{s=[...]} as one YAML list entry', () => {
+    const block = formatSkillsYamlBlock(
+      'skill{s=[\n  - potion{type=REGEN;duration=80;level=1}\n  - heal{a=4}\n]} @self ~onUse',
+    )
+    expect(block).toBe(
+      [
+        '  Skills:',
+        '  - skill{s=[',
+        '    - potion{type=REGEN;duration=80;level=1}',
+        '    - heal{a=4}',
+        '    ]} @self ~onUse',
+      ].join('\n'),
+    )
+    expect(block).not.toContain('- -')
+  })
   it('classifies category from nested and root-relative paths', () => {
     expect(classifyMythicCategory('Some Pack/Mobs/test.yml')).toBe('mobs')
     expect(classifyMythicCategory('Mobs/test.yml')).toBe('mobs')
     expect(classifyMythicCategory('Some Pack/skills/test.yml')).toBe('skills')
-    expect(classifyMythicCategory('packinfo.yml')).toBe('other')
+    expect(classifyMythicCategory('packinfo.yml')).toBe('packinfo')
   })
 
   it('detects pack names from Packs folders and single-pack roots', () => {

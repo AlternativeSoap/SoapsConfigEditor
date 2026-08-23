@@ -8,6 +8,7 @@ import {
 import { ARCHETYPE_PRESETS } from '../../data/mythicrpg/presets'
 import type { ArchetypeGeneratorInput, FileRecord } from '../../types'
 import { ColorTextField } from '../ColorTextField'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
 const STEPS = ['Identity', 'Progression', 'Unlocks'] as const
 
@@ -77,14 +78,6 @@ export function ArchetypeWizardDialog({
     setTargetPath(archetypeFiles[0]?.path ?? suggestArchetypePath(packRoot))
   }, [archetypeFiles, packRoot])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const yaml = useMemo(() => generateArchetypeYaml(input), [input])
 
   function patch(partial: Partial<ArchetypeGeneratorInput>): void {
@@ -139,22 +132,13 @@ export function ArchetypeWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg class-wizard"
-        role="dialog"
-        aria-labelledby="archetype-wizard-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <div>
-            <h2 id="archetype-wizard-title">New archetype</h2>
-            <p className="wz-step-hint">{STEP_HINTS[step]}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+    <DialogShell size="xl" className="class-wizard" labelledBy="archetype-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title="New archetype"
+        titleId="archetype-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <nav className="wizard-steps" aria-label="Steps">
           {STEPS.map((label, i) => (
@@ -173,9 +157,9 @@ export function ArchetypeWizardDialog({
           ))}
         </nav>
 
-        <div className="wizard-body">
+        <DialogBody className="wizard-body">
           {step === 0 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Identity">
               <div className="wz-preset-row">
                 <span className="wz-field-label">Presets</span>
                 {ARCHETYPE_PRESETS.map((preset) => (
@@ -253,11 +237,11 @@ export function ArchetypeWizardDialog({
                   onChange={(e) => patch({ description: e.target.value })}
                 />
               </label>
-            </div>
+            </DialogPanel>
           )}
 
           {step === 1 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Progression">
               <div className="wz-grid-2">
                 <label className="wz-field">
                   Min level
@@ -296,15 +280,15 @@ export function ArchetypeWizardDialog({
                   />
                 </label>
               </div>
-              <p className="create-section-hint">
+              <p className="dialog-note">
                 Curve and source ids must exist in your pack experience-curves.yml and experience-sources.yml files.
                 Defaults match common MythicRPG examples.
               </p>
-            </div>
+            </DialogPanel>
           )}
 
           {step === 2 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Unlocks">
               <label className="wz-field">
                 Spell unlocks
                 <textarea
@@ -315,12 +299,12 @@ export function ArchetypeWizardDialog({
                 />
               </label>
               {skillIds.length > 0 ? (
-                <p className="create-section-hint">
+                <p className="dialog-note">
                 Spell / skill ids in this pack: {skillIds.slice(0, 12).join(', ')}
                   {skillIds.length > 12 ? '…' : ''}
                 </p>
               ) : null}
-              <p className="create-section-hint">
+              <p className="dialog-note">
                 One unlock per line. Use SPELL, SPELL level, or SPELL:spellLevel archetypeLevel.
               </p>
               <label className="wz-field">
@@ -355,18 +339,15 @@ export function ArchetypeWizardDialog({
                   )}
                 </select>
               </label>
-            </div>
+            </DialogPanel>
           )}
-        </div>
+        </DialogBody>
 
         {error ? <p className="wz-step-error">{error}</p> : null}
 
-        <details className="create-preview-details">
-          <summary>YAML preview</summary>
-          <pre className="dialog-preview">{yaml}</pre>
-        </details>
+        <DialogPreviewBlock code={yaml} />
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>
             Cancel
           </button>
@@ -384,8 +365,7 @@ export function ArchetypeWizardDialog({
               Create archetype
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

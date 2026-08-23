@@ -43,6 +43,8 @@ import { BOOLEAN_VALUES } from './attrValueCompletions'
 import { AI_GOAL_SELECTORS, AI_TARGET_SELECTORS } from '../../data/mythicmobs/mobAiSelectors'
 import { MOB_OPTION_NAMES, mobOptionByName } from '../../data/mythicmobs/mobOptions'
 import { completionScrollLoadMore } from './completionScrollLoad'
+import { isPackInfoFile } from './packInfo'
+import { packInfoCompletions } from './packInfoCompletions'
 
 /** Collect Option keys already present under the current Options: block. */
 function collectSiblingMapKeys(
@@ -591,10 +593,16 @@ export function mythicCompletion(
   crucible: boolean,
   packEquipmentSetIds: string[] = [],
   packAugmentTypeIds: string[] = [],
+  filePath?: string,
 ) {
   const completions = buildCatalogCompletions(catalogs)
 
   return function(context: CompletionContext): CompletionResult | null {
+    if (isPackInfoFile(filePath)) {
+      const packInfoResult = packInfoCompletions(context)
+      if (packInfoResult) return packInfoResult
+    }
+
     const line = context.state.doc.lineAt(context.pos)
     const lineText = line.text
     const cursorCol = context.pos - line.from
@@ -843,6 +851,7 @@ export function buildMythicAutocomplete(
   crucible = false,
   packEquipmentSetIds: string[] = [],
   packAugmentTypeIds: string[] = [],
+  filePath?: string,
 ) {
   const catalogs = resolveMythicCatalogs(crucible)
   return [
@@ -859,6 +868,7 @@ export function buildMythicAutocomplete(
           crucible,
           packEquipmentSetIds,
           packAugmentTypeIds,
+          filePath,
         ),
       ],
       defaultKeymap: true,

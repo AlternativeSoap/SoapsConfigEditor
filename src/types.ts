@@ -39,6 +39,7 @@ export type MythicCategory =
   | 'quests'
   | 'equipment-sets'
   | 'augments'
+  | 'packinfo'
   | 'other'
 
 export type SessionMode = 'opened' | 'new-pack'
@@ -109,6 +110,7 @@ export type CreateKind =
   | 'archetype'
   | 'reagent'
   | 'quest'
+  | 'edit-quest'
   | 'equipment-set'
   | 'augment-type'
   | 'crucible-item'

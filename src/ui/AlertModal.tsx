@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { DialogFooter, DialogShell } from './DialogShell'
 
 export interface AlertModalProps {
   title: string
@@ -26,27 +27,23 @@ export function AlertModal({
   }, [onClose])
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className={`dialog dialog-sm alert-modal alert-${tone}`}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="alert-modal-title"
-        aria-describedby="alert-modal-body"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="alert-modal-icon" aria-hidden="true">
-          {tone === 'error' ? '!' : tone === 'info' ? 'i' : '⚠'}
-        </div>
-        <h2 id="alert-modal-title">{title}</h2>
-        <p id="alert-modal-body">{message}</p>
-        {detail ? <p className="alert-modal-detail">{detail}</p> : null}
-        <div className="dialog-actions">
-          <button type="button" className="primary" onClick={onClose} autoFocus>
-            {confirmLabel}
-          </button>
-        </div>
+    <DialogShell
+      size="sm"
+      className={`alert-modal alert-${tone}`}
+      labelledBy="alert-modal-title"
+      onClose={onClose}
+    >
+      <div className="alert-modal-icon" aria-hidden="true">
+        {tone === 'error' ? '!' : tone === 'info' ? 'i' : '⚠'}
       </div>
-    </div>
+      <h2 id="alert-modal-title">{title}</h2>
+      <p id="alert-modal-body">{message}</p>
+      {detail ? <p className="alert-modal-detail">{detail}</p> : null}
+      <DialogFooter>
+        <button type="button" className="primary" onClick={onClose} autoFocus>
+          {confirmLabel}
+        </button>
+      </DialogFooter>
+    </DialogShell>
   )
 }

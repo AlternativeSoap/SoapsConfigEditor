@@ -1,10 +1,13 @@
 import type { FileRecord, WorkspaceKind } from '../../types'
+import { generatePackInfoYaml } from '../mythicmobs/packInfo'
 import type { MythicAddons } from './mythicAddons'
 import { DEFAULT_MYTHIC_ADDONS } from './mythicAddons'
+import { buildLinkedPack } from './packExamples/buildLinkedPack'
 
 export interface ScaffoldOptions {
   packName: string
   mythicAddons?: MythicAddons
+  includeExamples?: boolean
 }
 
 function sanitizePackName(name: string): string {
@@ -47,15 +50,25 @@ export function scaffoldPack(kind: WorkspaceKind, options: ScaffoldOptions): Fil
   const packName = sanitizePackName(options.packName)
   const addons = options.mythicAddons ?? DEFAULT_MYTHIC_ADDONS
 
+  if (kind === 'mythicmobs' && options.includeExamples) {
+    return buildLinkedPack(packName, addons)
+  }
+
   if (kind === 'mythicmobs') {
     // Matches plugins/MythicMobs/Packs/{PackName}/ (open plugins/ as the workspace root)
     const base = `MythicMobs/Packs/${packName}`
     const files: FileRecord[] = [
       file(
         `${base}/packinfo.yml`,
-        `# MythicMobs pack: ${packName}\n# Server path: plugins/MythicMobs/Packs/${packName}/\nPack:\n  Name: ${packName}\n  Version: 1.0\n`,
+        generatePackInfoYaml({
+          name: packName,
+          headerComments: [
+            `MythicMobs pack: ${packName}`,
+            `Server path: plugins/MythicMobs/Packs/${packName}/`,
+          ],
+        }),
         packName,
-        'other',
+        'packinfo',
       ),
       file(`${base}/Mobs/mobs.yml`, `# Mobs for ${packName}\n`, packName, 'mobs'),
       file(`${base}/Items/items.yml`, `# Items for ${packName}\n`, packName, 'items'),
@@ -144,9 +157,15 @@ export function scaffoldPack(kind: WorkspaceKind, options: ScaffoldOptions): Fil
       ),
       file(
         `MythicMobs/Packs/${packName}/packinfo.yml`,
-        `# MythicMobs Packs only (plugins/MythicMobs/Packs/${packName}/).\n# MMOCore and MythicLib files above are separate plugin folders, not packs.\nPack:\n  Name: ${packName}\n  Version: 1.0\n`,
+        generatePackInfoYaml({
+          name: packName,
+          headerComments: [
+            `MythicMobs Packs only (plugins/MythicMobs/Packs/${packName}/).`,
+            'MMOCore and MythicLib files above are separate plugin folders, not packs.',
+          ],
+        }),
         packName,
-        'other',
+        'packinfo',
       ),
       file(
         `MythicMobs/Packs/${packName}/Skills/.keep.yml`,

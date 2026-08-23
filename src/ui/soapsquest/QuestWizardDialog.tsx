@@ -1,39 +1,51 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { RemoveButton } from '../RemoveButton'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 import {
   findQuestsYmlPath,
 } from '../../core/soapsquest/classify'
 import {
   generateQuestYaml,
   mergeIntoQuestsYml,
+  replaceQuestInQuestsYml,
   type QuestGeneratorInput,
+  type QuestItemRewardInput,
   type QuestObjectiveInput,
 } from '../../core/soapsquest/generators'
+import { parseQuestFromFile } from '../../core/soapsquest/parseQuest'
 import {
   extractDifficultyIds,
   extractQuestIds,
   extractTierIds,
 } from '../../core/soapsquest/questIds'
+import { BIOMES, ENTITY_TYPES } from '../../core/mythicmobs/attrValueCompletions'
+import { searchMaterials } from '../../data/minecraft/materials'
 import {
   DEFAULT_DIFFICULTY_IDS,
   DEFAULT_TIER_IDS,
 } from '../../data/soapsquest/defaults'
 import {
-  MVP_OBJECTIVE_TYPES,
+  defaultObjectiveForType,
+  OBJECTIVE_GROUPS,
   objectiveTypeInfo,
+  type ObjectiveFieldMode,
 } from '../../data/soapsquest/objectiveTypes'
 import type { FileRecord } from '../../types'
+import { AutocompleteField } from '../AutocompleteField'
 import { Switch } from '../Switch'
 
 const STEPS = ['Identity', 'Objectives', 'Rewards'] as const
 
 const STEP_HINTS = [
   'Name the quest and choose its paper, tier, and difficulty.',
-  'Add one or more objectives. Each needs a type, target, and amount.',
+  'Add one or more objectives. Fields change based on the objective type.',
   'Set XP, money, and sigil rewards. At least one reward must be greater than zero.',
 ]
 
+const EQUIP_SLOTS = ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HAND', 'OFFHAND'] as const
+
 function emptyObjective(): QuestObjectiveInput {
-  return { type: 'kill', target: 'ZOMBIE', amount: 10 }
+  return defaultObjectiveForType('kill')
 }
 
 function emptyQuest(): QuestGeneratorInput {
@@ -49,7 +61,97 @@ function emptyQuest(): QuestGeneratorInput {
     xp: 100,
     money: 50,
     sigils: 0,
+    itemRewards: [],
   }
+}
+
+function emptyItemReward(): QuestItemRewardInput {
+  return { material: 'DIAMOND', amount: 1, chance: 100 }
+}
+
+function searchEntities(query: string, limit = 12): string[] {
+  const q = query.trim().toUpperCase().replace(/\s+/g, '_')
+  if (!q) return ENTITY_TYPES.slice(0, limit)
+  const starts: string[] = []
+  const contains: string[] = []
+  for (const entity of ENTITY_TYPES) {
+    if (entity.startsWith(q)) starts.push(entity)
+    else if (entity.includes(q)) contains.push(entity)
+  }
+  return [...starts, ...contains].slice(0, limit)
+}
+
+function searchBiomes(query: string, limit = 12): string[] {
+  const q = query.trim().toUpperCase().replace(/\s+/g, '_')
+  if (!q) return BIOMES.slice(0, limit)
+  const starts: string[] = []
+  const contains: string[] = []
+  for (const biome of BIOMES) {
+    if (biome.startsWith(q)) starts.push(biome)
+    else if (biome.includes(q)) contains.push(biome)
+  }
+  return [...starts, ...contains].slice(0, limit)
+}
+
+function validateObjective(obj: QuestObjectiveInput, index: number): string | null {
+  const info = objectiveTypeInfo(obj.type)
+  const mode: ObjectiveFieldMode = info?.mode ?? 'target_amount'
+  const n = index + 1
+
+  if (mode === 'amount_only') {
+    if (!Number.isFinite(obj.amount) || obj.amount < 1) {
+      return `Objective ${n} amount must be at least 1.`
+    }
+    return null
+  }
+  if (mode === 'command') {
+    if (!(obj.command ?? '').trim()) return `Objective ${n} needs a command.`
+    if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+    return null
+  }
+  if (mode === 'placeholder') {
+    if (!(obj.placeholder ?? '').trim()) return `Objective ${n} needs a placeholder name.`
+    if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+    return null
+  }
+  if (mode === 'level_only') {
+    if (!Number.isFinite(obj.level) || (obj.level ?? 0) < 1) {
+      return `Objective ${n} level must be at least 1.`
+    }
+    return null
+  }
+  if (mode === 'vehicle_amount') {
+    if (!(obj.vehicle ?? '').trim()) return `Objective ${n} needs a vehicle type.`
+    if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+    return null
+  }
+  if (mode === 'text_amount') {
+    if (!(obj.text ?? '').trim()) return `Objective ${n} needs chat text.`
+    if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+    return null
+  }
+  if (mode === 'equip') {
+    if (!obj.target.trim()) return `Objective ${n} needs an item material.`
+    if (!(obj.slot ?? '').trim()) return `Objective ${n} needs an equipment slot.`
+    if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+    return null
+  }
+  if (mode === 'deliver_npc') {
+    if (!obj.target.trim()) return `Objective ${n} needs an NPC id.`
+    if (!(obj.item ?? '').trim()) return `Objective ${n} needs a delivery item (MATERIAL:amount).`
+    if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+    return null
+  }
+  if (mode === 'land_level') {
+    if (!obj.target.trim()) return `Objective ${n} needs a land name.`
+    if (!Number.isFinite(obj.level) || (obj.level ?? 0) < 1) {
+      return `Objective ${n} level must be at least 1.`
+    }
+    return null
+  }
+  if (!obj.target.trim()) return `Objective ${n} needs a target.`
+  if (obj.amount < 1) return `Objective ${n} amount must be at least 1.`
+  return null
 }
 
 export interface QuestWizardOutput {
@@ -58,16 +160,27 @@ export interface QuestWizardOutput {
 
 interface QuestWizardDialogProps {
   files: FileRecord[]
+  /** When set, wizard loads and replaces this quest id. */
+  editingQuestId?: string | null
   onClose: () => void
   onApply: (output: QuestWizardOutput) => void
 }
 
 const QUEST_ID_RE = /^[a-z][a-z0-9_]*$/
 
-export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialogProps) {
+export function QuestWizardDialog({
+  files,
+  editingQuestId = null,
+  onClose,
+  onApply,
+}: QuestWizardDialogProps) {
+  const isEdit = Boolean(editingQuestId)
   const [step, setStep] = useState(0)
   const [input, setInput] = useState<QuestGeneratorInput>(emptyQuest)
   const [error, setError] = useState('')
+  const [loaded, setLoaded] = useState(!isEdit)
+
+  const materialSearch = useCallback((q: string, limit?: number) => searchMaterials(q, limit), [])
 
   const questsPath = useMemo(() => findQuestsYmlPath(files), [files])
   const existingQuestsFile = useMemo(
@@ -105,12 +218,20 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
   }, [files])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+    if (!editingQuestId || !existingQuestsFile) {
+      if (!isEdit) setLoaded(true)
+      return
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+    const parsed = parseQuestFromFile(existingQuestsFile.content, editingQuestId)
+    if (!parsed) {
+      setError(`Could not load quest ${editingQuestId} from quests.yml.`)
+      setLoaded(true)
+      return
+    }
+    setInput(parsed)
+    setError('')
+    setLoaded(true)
+  }, [editingQuestId, existingQuestsFile, isEdit])
 
   const yaml = useMemo(() => generateQuestYaml(input), [input])
 
@@ -136,7 +257,13 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
       if (!QUEST_ID_RE.test(id)) {
         return 'Quest id must be lowercase letters, numbers, and underscores, and start with a letter.'
       }
-      if (existingQuestIds.some((q) => q.toLowerCase() === id.toLowerCase())) {
+      if (
+        existingQuestIds.some(
+          (q) =>
+            q.toLowerCase() === id.toLowerCase() &&
+            (!editingQuestId || q.toLowerCase() !== editingQuestId.toLowerCase()),
+        )
+      ) {
         return `Quest ${id} already exists in quests.yml. Choose a different id.`
       }
       if (!input.display.trim()) return 'Display name is required.'
@@ -147,17 +274,22 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
         return 'Add at least one objective.'
       }
       for (let i = 0; i < input.objectives.length; i += 1) {
-        const obj = input.objectives[i]
-        if (!obj.type) return `Objective ${i + 1} needs a type.`
-        if (!obj.target.trim()) return `Objective ${i + 1} needs a target.`
-        if (!Number.isFinite(obj.amount) || obj.amount < 1) {
-          return `Objective ${i + 1} amount must be at least 1.`
-        }
+        const err = validateObjective(input.objectives[i], i)
+        if (err) return err
       }
     }
     if (current === 2) {
-      if (input.xp <= 0 && input.money <= 0 && input.sigils <= 0) {
-        return 'Set at least one reward (XP, money, or sigils) greater than zero.'
+      const hasCurrency = input.xp > 0 || input.money > 0 || input.sigils > 0
+      const hasItems = input.itemRewards.some((item) => item.material.trim())
+      if (!hasCurrency && !hasItems) {
+        return 'Set at least one reward: XP, money, sigils, or an item.'
+      }
+      for (let i = 0; i < input.itemRewards.length; i += 1) {
+        const item = input.itemRewards[i]
+        if (!item.material.trim()) continue
+        if (!Number.isFinite(item.amount) || item.amount < 1) {
+          return `Item reward ${i + 1} amount must be at least 1.`
+        }
       }
     }
     return null
@@ -183,43 +315,364 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
       }
     }
     const questYaml = generateQuestYaml(input)
-    const merged = mergeIntoQuestsYml(
-      existingQuestsFile?.content ?? null,
-      questYaml,
-      input.id.trim(),
-    )
-    if (!merged.ok) {
-      setError(merged.error)
+    const content = existingQuestsFile?.content ?? ''
+    const result = isEdit && editingQuestId
+      ? replaceQuestInQuestsYml(content, editingQuestId, questYaml, input.id.trim())
+      : mergeIntoQuestsYml(existingQuestsFile?.content ?? null, questYaml, input.id.trim())
+
+    if (!result.ok) {
+      setError(result.error)
       return
     }
     onApply({
       files: [
         {
           path: questsPath,
-          content: merged.content,
+          content: result.content,
           mode: 'create',
         },
       ],
     })
   }
 
+  if (!loaded) {
+    return null
+  }
+
+  function renderObjectiveFields(obj: QuestObjectiveInput, index: number) {
+    const info = objectiveTypeInfo(obj.type)
+    const mode = info?.mode ?? 'target_amount'
+    const targetKind = info?.targetKind
+
+    if (mode === 'command') {
+      return (
+        <>
+          <label className="wz-field">
+            Command
+            <input
+              value={obj.command ?? ''}
+              onChange={(e) => updateObjective(index, { command: e.target.value.trim() })}
+              placeholder="help"
+            />
+          </label>
+          <label className="wz-field">
+            Amount
+            <input
+              type="number"
+              min={1}
+              value={obj.amount}
+              onChange={(e) =>
+                updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'placeholder') {
+      return (
+        <>
+          <label className="wz-field">
+            Placeholder
+            <input
+              value={obj.placeholder ?? ''}
+              onChange={(e) => updateObjective(index, { placeholder: e.target.value.trim() })}
+              placeholder="player_level"
+            />
+          </label>
+          <label className="wz-field">
+            Target value
+            <input
+              type="number"
+              min={1}
+              value={obj.amount}
+              onChange={(e) =>
+                updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'level_only') {
+      return (
+        <label className="wz-field">
+          Level
+          <input
+            type="number"
+            min={1}
+            value={obj.level ?? 1}
+            onChange={(e) =>
+              updateObjective(index, { level: Math.max(1, Number(e.target.value) || 1) })
+            }
+          />
+        </label>
+      )
+    }
+
+    if (mode === 'vehicle_amount') {
+      return (
+        <>
+          <label className="wz-field">
+            Vehicle
+            <input
+              value={obj.vehicle ?? 'ANY'}
+              onChange={(e) => updateObjective(index, { vehicle: e.target.value.trim().toUpperCase() })}
+              placeholder="ANY"
+            />
+          </label>
+          <label className="wz-field">
+            Blocks
+            <input
+              type="number"
+              min={1}
+              value={obj.amount}
+              onChange={(e) =>
+                updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'text_amount') {
+      return (
+        <>
+          <label className="wz-field">
+            Chat text
+            <input
+              value={obj.text ?? ''}
+              onChange={(e) => updateObjective(index, { text: e.target.value })}
+              placeholder="hello"
+            />
+          </label>
+          <label className="wz-field">
+            Amount
+            <input
+              type="number"
+              min={1}
+              value={obj.amount}
+              onChange={(e) =>
+                updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'equip') {
+      return (
+        <>
+          <AutocompleteField
+            label="Item material"
+            value={obj.target}
+            onChange={(target) => updateObjective(index, { target })}
+            search={materialSearch}
+            placeholder="DIAMOND_CHESTPLATE"
+          />
+          <label className="wz-field">
+            Slot
+            <select
+              value={obj.slot ?? 'CHEST'}
+              onChange={(e) => updateObjective(index, { slot: e.target.value })}
+            >
+              {EQUIP_SLOTS.map((slot) => (
+                <option key={slot} value={slot}>
+                  {slot}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="wz-field">
+            Amount
+            <input
+              type="number"
+              min={1}
+              value={obj.amount}
+              onChange={(e) =>
+                updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'deliver_npc') {
+      return (
+        <>
+          <label className="wz-field">
+            NPC id
+            <input
+              value={obj.target}
+              onChange={(e) => updateObjective(index, { target: e.target.value.trim() })}
+              placeholder="1"
+            />
+          </label>
+          <AutocompleteField
+            label="Delivery item"
+            value={(obj.item ?? '').split(':')[0] ?? ''}
+            onChange={(mat) => {
+              const amountPart = (obj.item ?? '').includes(':')
+                ? (obj.item ?? '').split(':')[1]
+                : '16'
+              updateObjective(index, { item: `${mat}:${amountPart}` })
+            }}
+            search={materialSearch}
+            placeholder="WHEAT"
+          />
+          <label className="wz-field">
+            Item amount
+            <input
+              type="number"
+              min={1}
+              value={(obj.item ?? '').includes(':') ? Number((obj.item ?? '').split(':')[1]) || 1 : 16}
+              onChange={(e) => {
+                const mat = (obj.item ?? 'WHEAT:16').split(':')[0] || 'WHEAT'
+                updateObjective(index, {
+                  item: `${mat}:${Math.max(1, Number(e.target.value) || 1)}`,
+                })
+              }}
+            />
+          </label>
+          <label className="wz-field">
+            Deliveries
+            <input
+              type="number"
+              min={1}
+              value={obj.amount}
+              onChange={(e) =>
+                updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'land_level') {
+      return (
+        <>
+          <label className="wz-field">
+            Land name
+            <input
+              value={obj.target}
+              onChange={(e) => updateObjective(index, { target: e.target.value.trim() })}
+              placeholder="MyLand"
+            />
+          </label>
+          <label className="wz-field">
+            Target level
+            <input
+              type="number"
+              min={1}
+              value={obj.level ?? 1}
+              onChange={(e) =>
+                updateObjective(index, { level: Math.max(1, Number(e.target.value) || 1) })
+              }
+            />
+          </label>
+        </>
+      )
+    }
+
+    if (mode === 'amount_only') {
+      return (
+        <label className="wz-field">
+          {info?.amountHint ?? 'Amount'}
+          <input
+            type="number"
+            min={1}
+            value={obj.amount}
+            onChange={(e) =>
+              updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+            }
+          />
+        </label>
+      )
+    }
+
+    const targetLabel =
+      targetKind === 'entity'
+        ? 'Entity'
+        : targetKind === 'biome'
+          ? 'Biome'
+          : targetKind === 'region'
+            ? 'Region'
+            : targetKind === 'npc'
+              ? 'NPC id'
+              : targetKind === 'skill'
+                ? 'Skill'
+                : targetKind === 'world'
+                  ? 'World'
+                  : 'Target'
+
+    const targetField =
+      targetKind === 'material' ? (
+        <AutocompleteField
+          label={targetLabel}
+          value={obj.target}
+          onChange={(target) => updateObjective(index, { target })}
+          search={materialSearch}
+          placeholder={info?.targetHint ?? 'TARGET'}
+        />
+      ) : targetKind === 'entity' ? (
+        <AutocompleteField
+          label={targetLabel}
+          value={obj.target}
+          onChange={(target) => updateObjective(index, { target })}
+          search={searchEntities}
+          placeholder={info?.targetHint ?? 'ZOMBIE'}
+        />
+      ) : targetKind === 'biome' ? (
+        <AutocompleteField
+          label={targetLabel}
+          value={obj.target}
+          onChange={(target) => updateObjective(index, { target })}
+          search={searchBiomes}
+          placeholder={info?.targetHint ?? 'PLAINS'}
+        />
+      ) : (
+        <label className="wz-field">
+          {targetLabel}
+          <input
+            value={obj.target}
+            onChange={(e) => updateObjective(index, { target: e.target.value })}
+            placeholder={info?.targetHint ?? 'TARGET'}
+          />
+        </label>
+      )
+
+    return (
+      <>
+        {targetField}
+        <label className="wz-field">
+          {info?.amountHint ?? 'Amount'}
+          <input
+            type="number"
+            min={1}
+            value={obj.amount}
+            onChange={(e) =>
+              updateObjective(index, { amount: Math.max(1, Number(e.target.value) || 1) })
+            }
+          />
+        </label>
+      </>
+    )
+  }
+
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg class-wizard"
-        role="dialog"
-        aria-labelledby="quest-wizard-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <div>
-            <h2 id="quest-wizard-title">New quest</h2>
-            <p className="wz-step-hint">{STEP_HINTS[step]}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+    <DialogShell size="xl" className="class-wizard" labelledBy="quest-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title={isEdit ? 'Edit quest' : 'New quest'}
+        titleId="quest-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <nav className="wizard-steps" aria-label="Steps">
           {STEPS.map((label, i) => (
@@ -247,9 +700,9 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
           ))}
         </nav>
 
-        <div className="wizard-body">
+        <DialogBody className="wizard-body">
           {step === 0 ? (
-            <div className="wizard-pane">
+            <DialogPanel title="Identity">
               <div className="wz-grid-2">
                 <label className="wz-field">
                   Quest id
@@ -267,14 +720,13 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
                     placeholder="zombie_slayer"
                   />
                 </label>
-                <label className="wz-field">
-                  Paper material
-                  <input
-                    value={input.material}
-                    onChange={(e) => patch({ material: e.target.value.trim().toUpperCase() })}
-                    placeholder="PAPER"
-                  />
-                </label>
+                <AutocompleteField
+                  label="Paper material"
+                  value={input.material}
+                  onChange={(material) => patch({ material })}
+                  search={materialSearch}
+                  placeholder="PAPER"
+                />
               </div>
               <label className="wz-field">
                 Display name
@@ -338,83 +790,67 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
                   aria-label="Lock to player"
                 />
               </div>
-            </div>
+              <DialogPreviewBlock code={yaml} />
+            </DialogPanel>
           ) : null}
 
           {step === 1 ? (
-            <div className="wizard-pane">
-              {input.objectives.map((obj, index) => {
-                const hint = objectiveTypeInfo(obj.type)?.targetHint ?? 'TARGET'
-                return (
-                  <div key={index} className="wz-grid-2" style={{ marginBottom: '0.75rem' }}>
+            <DialogPanel title="Objectives">
+              {input.objectives.map((obj, index) => (
+                <div key={index} className="objective-row" style={{ marginBottom: '1rem' }}>
+                  <div className="wz-grid-2">
                     <label className="wz-field">
                       Type
                       <select
                         value={obj.type}
                         onChange={(e) => {
                           const type = e.target.value
-                          const info = objectiveTypeInfo(type)
-                          updateObjective(index, {
-                            type,
-                            target: info?.targetHint ?? obj.target,
-                          })
+                          setInput((prev) => ({
+                            ...prev,
+                            objectives: prev.objectives.map((o, i) =>
+                              i === index ? defaultObjectiveForType(type) : o,
+                            ),
+                          }))
+                          setError('')
                         }}
                       >
-                        {MVP_OBJECTIVE_TYPES.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.label}
-                          </option>
+                        {OBJECTIVE_GROUPS.map((group) => (
+                          <optgroup key={group.id} label={group.label}>
+                            {group.types.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </label>
-                    <label className="wz-field">
-                      Target
-                      <input
-                        value={obj.target}
-                        onChange={(e) => updateObjective(index, { target: e.target.value })}
-                        placeholder={hint}
-                      />
-                    </label>
-                    <label className="wz-field">
-                      Amount
-                      <input
-                        type="number"
-                        min={1}
-                        value={obj.amount}
-                        onChange={(e) =>
-                          updateObjective(index, {
-                            amount: Math.max(1, Number(e.target.value) || 1),
-                          })
-                        }
-                      />
-                    </label>
                     <div className="wz-field" style={{ justifyContent: 'flex-end' }}>
-                      <button
-                        type="button"
+                      <RemoveButton
+                        aria-label={`Remove objective ${index + 1}`}
                         disabled={input.objectives.length <= 1}
                         onClick={() =>
                           patch({
                             objectives: input.objectives.filter((_, i) => i !== index),
                           })
                         }
-                      >
-                        Remove
-                      </button>
+                      />
                     </div>
                   </div>
-                )
-              })}
+                  <div className="wz-grid-2">{renderObjectiveFields(obj, index)}</div>
+                </div>
+              ))}
               <button
                 type="button"
                 onClick={() => patch({ objectives: [...input.objectives, emptyObjective()] })}
               >
                 Add objective
               </button>
-            </div>
+            </DialogPanel>
           ) : null}
 
           {step === 2 ? (
-            <div className="wizard-pane">
+            <DialogPanel title="Rewards">
               <div className="wz-grid-2">
                 <label className="wz-field">
                   XP
@@ -451,21 +887,112 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
                   />
                 </label>
               </div>
-              <p className="wz-step-hint">
+              {input.itemRewards.length > 0 ? (
+                <div style={{ marginTop: '1rem' }}>
+                  {input.itemRewards.map((item, index) => (
+                    <div key={index} className="objective-row" style={{ marginBottom: '0.75rem' }}>
+                      <div className="wz-grid-2">
+                        <AutocompleteField
+                          label="Material"
+                          value={item.material}
+                          onChange={(material) => {
+                            const itemRewards = input.itemRewards.map((row, i) =>
+                              i === index ? { ...row, material } : row,
+                            )
+                            patch({ itemRewards })
+                          }}
+                          search={materialSearch}
+                          placeholder="DIAMOND"
+                        />
+                        <div className="wz-field" style={{ justifyContent: 'flex-end' }}>
+                          <RemoveButton
+                            aria-label={`Remove item reward ${index + 1}`}
+                            onClick={() =>
+                              patch({
+                                itemRewards: input.itemRewards.filter((_, i) => i !== index),
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="wz-grid-2">
+                        <label className="wz-field">
+                          Amount
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.amount}
+                            onChange={(e) => {
+                              const itemRewards = input.itemRewards.map((row, i) =>
+                                i === index
+                                  ? { ...row, amount: Math.max(1, Number(e.target.value) || 1) }
+                                  : row,
+                              )
+                              patch({ itemRewards })
+                            }}
+                          />
+                        </label>
+                        <label className="wz-field">
+                          Drop chance (%)
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={item.chance}
+                            onChange={(e) => {
+                              const itemRewards = input.itemRewards.map((row, i) =>
+                                i === index
+                                  ? {
+                                      ...row,
+                                      chance: Math.max(
+                                        0,
+                                        Math.min(100, Number(e.target.value) || 100),
+                                      ),
+                                    }
+                                  : row,
+                              )
+                              patch({ itemRewards })
+                            }}
+                          />
+                        </label>
+                        <label className="wz-field">
+                          Display name
+                          <input
+                            value={item.name ?? ''}
+                            onChange={(e) => {
+                              const itemRewards = input.itemRewards.map((row, i) =>
+                                i === index
+                                  ? { ...row, name: e.target.value.trim() || undefined }
+                                  : row,
+                              )
+                              patch({ itemRewards })
+                            }}
+                            placeholder="Optional MiniMessage name"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => patch({ itemRewards: [...input.itemRewards, emptyItemReward()] })}
+              >
+                Add item reward
+              </button>
+              <p className="dialog-note">
                 Writes to {questsPath}. Run /sq reload on the server after you save.
               </p>
-            </div>
+            </DialogPanel>
           ) : null}
-        </div>
+        </DialogBody>
 
         {error ? <p className="wz-step-error">{error}</p> : null}
 
-        <details className="create-preview-details">
-          <summary>YAML preview</summary>
-          <pre className="dialog-preview">{yaml}</pre>
-        </details>
+        <DialogPreviewBlock code={yaml} />
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>
             Cancel
           </button>
@@ -480,11 +1007,10 @@ export function QuestWizardDialog({ files, onClose, onApply }: QuestWizardDialog
             </button>
           ) : (
             <button type="button" className="primary" onClick={submit}>
-              Create quest
+              {isEdit ? 'Save quest' : 'Create quest'}
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

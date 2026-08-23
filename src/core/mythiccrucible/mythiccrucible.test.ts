@@ -70,6 +70,11 @@ describe('mythiccrucible generators', () => {
     )
     expect(yaml).toContain('~onUse')
     expect(yaml).toContain('consumeuseditem')
+    expect(yaml).not.toContain('- -')
+    expect(yaml).toContain('  - skill{s=[')
+    expect(yaml).toContain('    - potion{type=REGEN;duration=100;level=1}')
+    expect(yaml).toContain('    - consumeuseditem{amount=1} @self')
+    expect(yaml).toContain('    ]} @self ~onUse')
   })
 })
 

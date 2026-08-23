@@ -9,6 +9,7 @@ import { SPELL_PRESETS } from '../../data/mythicrpg/presets'
 import type { FileRecord, SpellCastingMode, SpellGeneratorInput } from '../../types'
 import { ColorTextField } from '../ColorTextField'
 import { SkillLineBuilder } from '../SkillLineBuilder'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
 const STEPS = ['Identity', 'Casting', 'Cost and power'] as const
 
@@ -92,14 +93,6 @@ export function SpellWizardDialog({
     setTargetPath(preferred)
   }, [skillFiles, packRoot])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const yaml = useMemo(() => generateSpellYaml(input), [input])
 
   function patch(partial: Partial<SpellGeneratorInput>): void {
@@ -164,23 +157,13 @@ export function SpellWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg class-wizard"
-        role="dialog"
-        aria-labelledby="spell-wizard-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <div>
-            <h2 id="spell-wizard-title">New spell</h2>
-            <p className="wz-step-hint">{STEP_HINTS[step]}</p>
-            <p className="create-section-hint">Choose a target Skills file, then save afterwards to write it.</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
+    <DialogShell size="xl" className="class-wizard" labelledBy="spell-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title="New spell"
+        titleId="spell-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <nav className="wizard-steps" aria-label="Steps">
           {STEPS.map((label, i) => (
@@ -199,9 +182,9 @@ export function SpellWizardDialog({
           ))}
         </nav>
 
-        <div className="wizard-body">
+        <DialogBody className="wizard-body">
           {step === 0 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Identity">
               <div className="wz-preset-row">
                 <span className="wz-field-label">Presets</span>
                 {SPELL_PRESETS.map((preset) => (
@@ -253,11 +236,11 @@ export function SpellWizardDialog({
                   placeholder="One or two lines for menus and /spell info"
                 />
               </label>
-            </div>
+            </DialogPanel>
           )}
 
           {step === 1 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Casting">
               <div className="wz-preset-row">
                 <span className="wz-field-label">Casting</span>
                 {(
@@ -295,15 +278,15 @@ export function SpellWizardDialog({
                   placeholder="@target"
                 />
               </label>
-              <p className="create-section-hint">
+              <p className="dialog-note">
                 Bound spells use ~onUse after the player binds them. Click combos fire on combat clicks. Passive
                 global spells are granted to every player.
               </p>
-            </div>
+            </DialogPanel>
           )}
 
           {step === 2 && (
-            <div className="wizard-pane">
+            <DialogPanel title="Cost and power">
               <div className="wz-grid-2">
                 <label className="wz-field">
                   Cooldown (seconds)
@@ -350,7 +333,7 @@ export function SpellWizardDialog({
                 </label>
               </div>
               {reagentIds.length === 0 ? (
-                <p className="create-section-hint">
+                <p className="dialog-note">
                   No reagents in this pack yet. Use New → New reagent first if this spell should cost a resource.
                 </p>
               ) : null}
@@ -406,8 +389,8 @@ export function SpellWizardDialog({
                   </label>
                 </div>
               )}
-              <div className="create-section-head">
-                <h3 className="create-section-title">Skills</h3>
+              <div className="dialog-panel-toolbar">
+                <h3 className="dialog-section-title">Skills</h3>
                 <button
                   type="button"
                   className={`slb-open-btn${builderOpen ? ' active' : ''}`}
@@ -449,18 +432,15 @@ export function SpellWizardDialog({
                   )}
                 </select>
               </label>
-            </div>
+            </DialogPanel>
           )}
-        </div>
+        </DialogBody>
 
         {error ? <p className="wz-step-error">{error}</p> : null}
 
-        <details className="create-preview-details">
-          <summary>YAML preview</summary>
-          <pre className="dialog-preview">{yaml}</pre>
-        </details>
+        <DialogPreviewBlock code={yaml} />
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>
             Cancel
           </button>
@@ -478,8 +458,7 @@ export function SpellWizardDialog({
               Create spell
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

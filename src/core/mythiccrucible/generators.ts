@@ -1,4 +1,4 @@
-import { yamlQuoted } from '../mythicmobs/generators'
+import { formatSkillsYamlBlock, yamlQuoted } from '../mythicmobs/generators'
 import type {
   AugmentTypeGeneratorInput,
   CrucibleItemGeneratorInput,
@@ -10,6 +10,11 @@ function listLines(raw: string): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
+}
+
+function pushSkillsBlock(lines: string[], raw: string, indent: string): void {
+  const block = formatSkillsYamlBlock(raw, { indent })
+  if (block) lines.push(block)
 }
 
 export function resolvePackRoot(files: { path: string; pack: string }[], packName: string): string {
@@ -63,13 +68,7 @@ export function generateEquipmentSetYaml(input: EquipmentSetGeneratorInput): str
           lines.push(`    - ${stat}`)
         }
       }
-      const skills = listLines(bonus.skills)
-      if (skills.length > 0) {
-        lines.push('    Skills:')
-        for (const skill of skills) {
-          lines.push(`    - ${skill}`)
-        }
-      }
+      pushSkillsBlock(lines, bonus.skills, '    ')
     }
   }
 
@@ -216,13 +215,7 @@ export function generateCrucibleItemYaml(input: CrucibleItemGeneratorInput): str
         lines.push(`    - ${stat}`)
       }
     }
-    const gemSkills = listLines(input.skills)
-    if (gemSkills.length > 0) {
-      lines.push('    Skills:')
-      for (const skill of gemSkills) {
-        lines.push(`    - ${skill}`)
-      }
-    }
+    pushSkillsBlock(lines, input.skills, '    ')
   }
 
   if (input.role === 'socket' && input.augmentType.trim()) {
@@ -251,12 +244,8 @@ export function generateCrucibleItemYaml(input: CrucibleItemGeneratorInput): str
     }
   }
 
-  const skills = listLines(input.skills)
-  if (skills.length > 0 && input.role !== 'gem') {
-    lines.push('  Skills:')
-    for (const skill of skills) {
-      lines.push(`  - ${skill}`)
-    }
+  if (input.role !== 'gem') {
+    pushSkillsBlock(lines, input.skills, '  ')
   }
 
   if (input.recipeType && listLines(input.recipeIngredients).length > 0) {

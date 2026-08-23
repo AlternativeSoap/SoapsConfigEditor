@@ -39,6 +39,7 @@ const MMOCORE_ITEMS: { kind: CreateKind; label: string }[] = [
 
 const SOAPSQUEST_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'quest', label: 'New quest' },
+  { kind: 'edit-quest', label: 'Edit quest' },
 ]
 
 function MenuSection({

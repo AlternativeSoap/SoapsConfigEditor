@@ -9,6 +9,7 @@ import { AUGMENT_TYPE_PRESETS } from '../../data/mythiccrucible/presets'
 import type { AugmentTypeGeneratorInput, FileRecord } from '../../types'
 import { ColorTextField } from '../ColorTextField'
 import { Switch } from '../Switch'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
 const STEPS = ['Identity', 'Formatting'] as const
 
@@ -85,14 +86,6 @@ export function AugmentTypeWizardDialog({
     setTargetPath(augmentFiles[0]?.path ?? suggestAugmentsPath(packRoot))
   }, [augmentFiles, packRoot])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const yaml = useMemo(() => generateAugmentTypeYaml(input), [input])
 
   function patch(partial: Partial<AugmentTypeGeneratorInput>): void {
@@ -129,19 +122,13 @@ export function AugmentTypeWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <div
-        className="dialog wizard-dialog"
-        role="dialog"
-        aria-labelledby="augment-type-wizard-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <header className="dialog-header">
-          <h2 id="augment-type-wizard-title">New augment type</h2>
-          <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </header>
+    <DialogShell size="lg" className="wizard-dialog" labelledBy="augment-type-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title="New augment type"
+        titleId="augment-type-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <div className="wizard-steps" role="tablist">
           {STEPS.map((label, i) => (
@@ -157,13 +144,11 @@ export function AugmentTypeWizardDialog({
             </button>
           ))}
         </div>
-        <p className="wizard-step-hint">{STEP_HINTS[step]}</p>
 
         {step === 0 && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Identity</h3>
-              <div className="create-section-body">
+          <DialogBody>
+            <DialogPanel title="Identity">
+              <div className="dialog-fields">
                 <label>
                   Preset
                   <select
@@ -204,15 +189,14 @@ export function AugmentTypeWizardDialog({
                   <input value={targetPath} onChange={(e) => setTargetPath(e.target.value)} />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {step === 1 && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Formatting</h3>
-              <div className="create-section-body">
+          <DialogBody>
+            <DialogPanel title="Formatting">
+              <div className="dialog-fields">
                 <ColorTextField
                   label="Empty slot line"
                   value={input.emptyFormat}
@@ -247,14 +231,14 @@ export function AugmentTypeWizardDialog({
                   <input value={input.iconInvalid} onChange={(e) => patch({ iconInvalid: e.target.value })} />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
-        <pre className="wizard-preview">{yaml}</pre>
+        <DialogPreviewBlock code={yaml} />
         {error ? <p className="error-copy">{error}</p> : null}
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>Cancel</button>
           {step > 0 ? (
             <button type="button" onClick={() => setStep((s) => s - 1)}>Back</button>
@@ -268,8 +252,7 @@ export function AugmentTypeWizardDialog({
               Create augment type
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

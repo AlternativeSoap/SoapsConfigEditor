@@ -20,6 +20,7 @@ import {
   writePackToDirectory,
 } from './core/filesystem/browserFs'
 import { backupPack } from './core/filesystem/backup'
+import { downloadPackZip, downloadTextExport } from './core/filesystem/exportPack'
 import {
   detectBrowserKind,
   folderWriteBlockedHelp,
@@ -47,7 +48,9 @@ import {
   classifySoapsQuestCategory,
   detectSoapsQuestPackName,
 } from './core/soapsquest/classify'
+import { buildSoapsQuestCatalog } from './core/soapsquest/catalog'
 import { extractQuestIds } from './core/soapsquest/questIds'
+import { indexQuestDisplays } from './core/soapsquest/parseQuest'
 import { matchesSearch } from './core/search/matchFiles'
 import { buildPackTree, categoryKey, CATEGORY_LABEL } from './core/search/packTree'
 import { extractTopLevelIds, parseYaml } from './core/yaml/parseYaml'
@@ -87,6 +90,8 @@ import { ArchetypeWizardDialog } from './ui/mythicrpg/ArchetypeWizardDialog'
 import { ReagentWizardDialog } from './ui/mythicrpg/ReagentWizardDialog'
 import { SpellWizardDialog } from './ui/mythicrpg/SpellWizardDialog'
 import { QuestWizardDialog } from './ui/soapsquest/QuestWizardDialog'
+import { EditQuestPickerDialog } from './ui/soapsquest/EditQuestPickerDialog'
+import { QuestIssuesPanel } from './ui/soapsquest/QuestIssuesPanel'
 import { ReferencePanel } from './ui/ReferencePanel'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { TopbarFileMenu } from './ui/TopbarFileMenu'
@@ -117,7 +122,10 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | MythicCategory>('all')
   const [openPacks, setOpenPacks] = useState<Set<string>>(new Set())
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set())
+  const [openQuestFiles, setOpenQuestFiles] = useState<Set<string>>(new Set())
+  const pendingQuestScrollRef = useRef<string | null>(null)
   const [createKind, setCreateKind] = useState<CreateKind | null>(null)
+  const [editingQuestId, setEditingQuestId] = useState<string | null>(null)
   const [newPackOpen, setNewPackOpen] = useState(false)
   const [alertModal, setAlertModal] = useState<{
     title: string
@@ -134,6 +142,7 @@ function App() {
   )
   const [depPanelOpen, setDepPanelOpen] = useState(true)
   const [packIssuesOpen, setPackIssuesOpen] = useState(true)
+  const [questIssuesOpen, setQuestIssuesOpen] = useState(true)
   const [backupReady, setBackupReady] = useState(() => hasBackupFolder())
   const [acPrefs, setAcPrefs] = useState<AcPrefs>(() => {
     try {
@@ -218,6 +227,7 @@ function App() {
   const isDirty = activePath ? dirtyMap.has(activePath) : false
   const dirtyCount = dirtyMap.size
   const needsSaveFolder = sessionMode === 'new-pack' && !canWriteToDisk
+  const canExportFromBrowser = !canWriteToDisk && files.length > 0
 
   // Latest values for timers/shortcuts/async saves (avoid stale closures)
   const dirtyMapRef = useRef(dirtyMap)
@@ -398,6 +408,28 @@ function App() {
   }), [effectiveFiles])
 
   const mmocoreIndex = useMemo(() => indexMMOCorePack(effectiveFiles), [effectiveFiles])
+
+  const soapsQuestCatalog = useMemo(() => {
+    if (!isSoapsQuest) return undefined
+    const active = effectiveFiles.find((f) => f.path === activePath)
+    if (!active || active.category !== 'quests') return undefined
+    return buildSoapsQuestCatalog(effectiveFiles)
+  }, [isSoapsQuest, effectiveFiles, activePath])
+
+  const questsFileEntry = useMemo(() => {
+    if (!isSoapsQuest) return null
+    return (
+      effectiveFiles.find((f) => {
+        const n = f.path.replace(/\\/g, '/').toLowerCase()
+        return n === 'quests.yml' || n.endsWith('/quests.yml')
+      }) ?? null
+    )
+  }, [isSoapsQuest, effectiveFiles])
+
+  const questDisplayLabels = useMemo(() => {
+    if (!questsFileEntry) return new Map<string, string>()
+    return indexQuestDisplays(questsFileEntry.content)
+  }, [questsFileEntry])
 
   const mythicPackName = useMemo(() => {
     const fromMm = files.find((f) => f.path.replace(/\\/g, '/').includes('MythicMobs/Packs/'))
@@ -668,6 +700,7 @@ function App() {
     const scaffolded = scaffoldPack(workspaceId, {
       packName: options.packName,
       mythicAddons: workspaceId === 'mythicmobs' ? mythicAddons : undefined,
+      includeExamples: workspaceId === 'mythicmobs' ? options.includeExamples : undefined,
     })
     const mapped = scaffolded
       .map((file) => toFileRecord(file, options.packName))
@@ -701,14 +734,14 @@ function App() {
         )
       } else {
         setStatusMessage(
-          `Created “${options.packName}” in this browser. Use File → Choose save folder when you are ready to write to disk.`,
+          `Created “${options.packName}” in this browser. Use Export ZIP when you are ready to download the files, or File → Choose save folder to write to disk.`,
         )
       }
       return
     }
 
     setStatusMessage(
-      `Created “${options.packName}” in this browser. It stays here until you clear site data. Use Ctrl+S to save the current file.`,
+      `Created “${options.packName}” in this browser. It stays here until you clear site data. Use Export ZIP to download the files.`,
     )
   }
 
@@ -838,6 +871,58 @@ function App() {
       else next.add(key)
       return next
     })
+  }
+
+  function toggleOpenQuestFile(path: string): void {
+    setOpenQuestFiles((current) => {
+      const next = new Set(current)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  function openQuestInEditor(file: FileRecord, questId: string): void {
+    selectFile(file)
+    pendingQuestScrollRef.current = questId
+  }
+
+  useEffect(() => {
+    const questId = pendingQuestScrollRef.current
+    if (!questId || activeFile?.category !== 'quests') return
+    pendingQuestScrollRef.current = null
+    requestAnimationFrame(() => {
+      editorRef.current?.goToQuestBlock(questId)
+    })
+  }, [activePath, draft, activeFile?.category])
+
+  async function exportPackAsZip(): Promise<void> {
+    const snapshot = effectiveFilesRef.current.map((f) => ({
+      path: f.path,
+      content: f.content,
+    }))
+    if (snapshot.length === 0) {
+      setStatusMessage('No files to export.')
+      return
+    }
+    try {
+      const name = downloadPackZip(snapshot, packDisplayNameRef.current || 'pack')
+      setStatusMessage(
+        `Downloaded ${name} with ${snapshot.length} file(s). Unzip it into your server plugins folder.`,
+      )
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Could not export the pack.')
+    }
+  }
+
+  function exportCurrentFile(): void {
+    if (!activeFile) return
+    try {
+      downloadTextExport(activeFile.path, draftRef.current)
+      setStatusMessage(`Downloaded ${activeFile.name}. Move it into your config folder to use it on the server.`)
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Could not export the file.')
+    }
   }
 
   /** Save a single file by path+content. Returns updated FileRecord or null on failure. */
@@ -1231,7 +1316,13 @@ function App() {
   }
 
   function handleCreate(kind: CreateKind): void {
+    if (kind === 'quest') setEditingQuestId(null)
     setCreateKind(kind)
+  }
+
+  function closeQuestWizard(): void {
+    setCreateKind(null)
+    setEditingQuestId(null)
   }
 
   useEffect(() => {
@@ -1322,6 +1413,7 @@ function App() {
             workspaceId={workspaceId}
             savePrefs={savePrefs}
             folderPickerAvailable={directoryPickerSupported()}
+            mythicAddons={workspaceId === 'mythicmobs' ? mythicAddons : undefined}
             onClose={() => setNewPackOpen(false)}
             onConfirm={confirmStartNewPack}
           />
@@ -1357,15 +1449,29 @@ function App() {
           <TopbarFileMenu
             startLabel={workspace?.startLabel ?? 'Start new files'}
             needsSaveFolder={needsSaveFolder}
+            canExport={canExportFromBrowser}
             folderWriteBlocked={folderWriteBlocked}
             dirtyCount={dirtyCount}
+            hasActiveFile={Boolean(activeFile)}
             onOpenFolder={() => void openFolder()}
             onChooseSaveFolder={() => void bindSaveFolder()}
             onReconnectFolder={() => void reconnectFolder()}
             onStartNewPack={() => setNewPackOpen(true)}
             onSaveAll={() => void saveAllFiles(false)}
+            onExportPack={() => void exportPackAsZip()}
+            onExportCurrentFile={exportCurrentFile}
             onChangeWorkspace={changeWorkspace}
           />
+          {canExportFromBrowser ? (
+            <button
+              type="button"
+              className={needsSaveFolder ? 'primary' : ''}
+              onClick={() => void exportPackAsZip()}
+              title="Download all files as a ZIP"
+            >
+              Export ZIP
+            </button>
+          ) : null}
           <button
             type="button"
             className={needsSaveFolder || isDirty ? 'primary' : ''}
@@ -1504,24 +1610,83 @@ function App() {
                                 <span className="tree-count">{node.files.length}</span>
                               </button>
                               {catOpen
-                                ? node.files.map((file) => (
-                                    <button
-                                      key={file.path}
-                                      type="button"
-                                      className={
-                                        file.path === activePath
-                                          ? 'tree-row file active'
-                                          : 'tree-row file'
-                                      }
-                                      title={file.path}
-                                      onClick={() => selectFile(file)}
-                                    >
-                                      <span className="tree-label">
-                                        {file.name}
-                                        {dirtyMap.has(file.path) ? <span className="dirty-dot" title="Unsaved changes"> ●</span> : null}
-                                      </span>
-                                    </button>
-                                  ))
+                                ? node.files.map((file) => {
+                                    const isQuestsFile =
+                                      isSoapsQuest &&
+                                      file.category === 'quests' &&
+                                      file.name.toLowerCase() === 'quests.yml'
+                                    const questListOpen = openQuestFiles.has(file.path)
+                                    const questIds = isQuestsFile ? file.ids : []
+                                    return (
+                                      <div key={file.path}>
+                                        <div
+                                          className={
+                                            file.path === activePath
+                                              ? 'tree-row file file-row-split active'
+                                              : 'tree-row file file-row-split'
+                                          }
+                                        >
+                                          {isQuestsFile && questIds.length > 0 ? (
+                                            <button
+                                              type="button"
+                                              className="tree-row-chevron"
+                                              aria-expanded={questListOpen}
+                                              aria-label={
+                                                questListOpen ? 'Collapse quests' : 'Expand quests'
+                                              }
+                                              onClick={() => toggleOpenQuestFile(file.path)}
+                                            >
+                                              {questListOpen ? '▾' : '▸'}
+                                            </button>
+                                          ) : (
+                                            <span className="tree-row-chevron-spacer" aria-hidden="true" />
+                                          )}
+                                          <button
+                                            type="button"
+                                            className="tree-row-file-label"
+                                            title={file.path}
+                                            onClick={() => selectFile(file)}
+                                          >
+                                            <span className="tree-label">
+                                              {file.name}
+                                              {dirtyMap.has(file.path) ? (
+                                                <span className="dirty-dot" title="Unsaved changes">
+                                                  {' '}
+                                                  ●
+                                                </span>
+                                              ) : null}
+                                            </span>
+                                          </button>
+                                        </div>
+                                        {isQuestsFile && questListOpen
+                                          ? questIds.map((questId) => {
+                                              const label = questDisplayLabels.get(questId)
+                                              const subtitle =
+                                                label && label !== questId ? label : null
+                                              return (
+                                                <button
+                                                  key={`${file.path}:${questId}`}
+                                                  type="button"
+                                                  className="tree-row file quest-entry"
+                                                  title={questId}
+                                                  onClick={() => openQuestInEditor(file, questId)}
+                                                >
+                                                  <span className="tree-label">
+                                                    {questId}
+                                                    {subtitle ? (
+                                                      <span className="tree-label-muted">
+                                                        {' '}
+                                                        · {subtitle}
+                                                      </span>
+                                                    ) : null}
+                                                  </span>
+                                                </button>
+                                              )
+                                            })
+                                          : null}
+                                      </div>
+                                    )
+                                  })
                                 : null}
                             </div>
                           )
@@ -1576,6 +1741,29 @@ function App() {
                     if (f) selectFile(f)
                   }}
                   onApplyPatches={applyFilePatches}
+                />
+              )}
+            </div>
+          )}
+
+          {isSoapsQuest && files.length > 0 && (
+            <div className="dep-panel-wrap">
+              <button
+                type="button"
+                className="dep-panel-toggle"
+                onClick={() => setQuestIssuesOpen((v) => !v)}
+                aria-expanded={questIssuesOpen}
+              >
+                <span className="chevron">{questIssuesOpen ? '▾' : '▸'}</span>
+                Quest issues
+              </button>
+              {questIssuesOpen && (
+                <QuestIssuesPanel
+                  files={effectiveFiles}
+                  onNavigate={(path) => {
+                    const f = files.find((x) => x.path === path)
+                    if (f) selectFile(f)
+                  }}
                 />
               )}
             </div>
@@ -1639,6 +1827,11 @@ function App() {
             <strong>{activeFile?.path ?? 'No file selected'}</strong>
             {isDirty ? <span>Unsaved</span> : null}
           </div>
+          {activeFile?.category === 'packinfo' ? (
+            <p className="editor-hint">
+              Pack metadata for <code>/mm menu</code>. Type a key for suggestions (Name, Version, Icon, Description).
+            </p>
+          ) : null}
           <YamlEditor
             ref={editorRef}
             value={draft}
@@ -1659,7 +1852,9 @@ function App() {
             packIndex={isMythicMobs ? packIndex : undefined}
             acPrefs={isMythicMobs ? acPrefs : undefined}
             fileCategory={isMythicMobs ? activeFile?.category : undefined}
+            filePath={activeFile?.path}
             crucibleEnabled={crucibleEnabled}
+            soapsQuestCatalog={soapsQuestCatalog}
             onLineContextChange={setEditorLineContext}
           />
           {parseIssues.length > 0 ? (
@@ -1721,6 +1916,7 @@ function App() {
       createKind !== 'archetype' &&
       createKind !== 'reagent' &&
       createKind !== 'quest' &&
+      createKind !== 'edit-quest' &&
       createKind !== 'equipment-set' &&
       createKind !== 'augment-type' &&
       createKind !== 'crucible-item' &&
@@ -1857,14 +2053,30 @@ function App() {
           }}
         />
       ) : null}
+      {createKind === 'edit-quest' && isSoapsQuest ? (
+        <EditQuestPickerDialog
+          files={effectiveFiles}
+          onClose={() => setCreateKind(null)}
+          onSelect={(questId) => {
+            setEditingQuestId(questId)
+            setCreateKind('quest')
+          }}
+        />
+      ) : null}
       {createKind === 'quest' && isSoapsQuest ? (
         <QuestWizardDialog
           files={effectiveFiles}
-          onClose={() => setCreateKind(null)}
+          editingQuestId={editingQuestId}
+          onClose={closeQuestWizard}
           onApply={(out) => {
+            const wasEdit = editingQuestId != null
             void applyMultiFileWrite(out.files)
-            setCreateKind(null)
-            setStatusMessage('Quest added. Save the file to keep it.')
+            closeQuestWizard()
+            setStatusMessage(
+              wasEdit
+                ? 'Quest updated. Save the file to keep it.'
+                : 'Quest added. Save the file to keep it.',
+            )
           }}
         />
       ) : null}
@@ -1873,6 +2085,7 @@ function App() {
           workspaceId={workspaceId}
           savePrefs={savePrefs}
           folderPickerAvailable={directoryPickerSupported()}
+          mythicAddons={workspaceId === 'mythicmobs' ? mythicAddons : undefined}
           onClose={() => setNewPackOpen(false)}
           onConfirm={confirmStartNewPack}
         />

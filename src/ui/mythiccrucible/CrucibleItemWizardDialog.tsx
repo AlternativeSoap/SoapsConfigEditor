@@ -15,6 +15,7 @@ import type {
 import { ColorTextField } from '../ColorTextField'
 import { SkillLineBuilder } from '../SkillLineBuilder'
 import { Switch } from '../Switch'
+import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
 const STEPS = ['Identity', 'Options', 'Power', 'Skills and craft'] as const
 
@@ -92,14 +93,6 @@ export function CrucibleItemWizardDialog({
     setTargetPath(itemFiles[0]?.path ?? suggestCrucibleItemPath(packRoot))
   }, [itemFiles, packRoot])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const yaml = useMemo(() => generateCrucibleItemYaml(input), [input])
 
   function patch(partial: Partial<CrucibleItemGeneratorInput>): void {
@@ -131,21 +124,13 @@ export function CrucibleItemWizardDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <div
-        className="dialog wizard-dialog"
-        role="dialog"
-        aria-labelledby="crucible-item-wizard-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <header className="dialog-header">
-          <h2 id="crucible-item-wizard-title">
-            {initialAsBag ? 'New bag' : 'New Crucible item'}
-          </h2>
-          <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </header>
+    <DialogShell size="lg" className="wizard-dialog" labelledBy="crucible-item-wizard-title" onClose={onClose}>
+      <DialogHeader
+        title={initialAsBag ? 'New bag' : 'New Crucible item'}
+        titleId="crucible-item-wizard-title"
+        onClose={onClose}
+        lead={STEP_HINTS[step]}
+      />
 
         <div className="wizard-steps" role="tablist">
           {STEPS.map((label, i) => (
@@ -161,13 +146,11 @@ export function CrucibleItemWizardDialog({
             </button>
           ))}
         </div>
-        <p className="wizard-step-hint">{STEP_HINTS[step]}</p>
 
         {step === 0 && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Identity</h3>
-              <div className="create-section-body">
+          <DialogBody>
+            <DialogPanel title="Identity">
+              <div className="dialog-fields">
                 <label>
                   Preset
                   <select
@@ -242,15 +225,14 @@ export function CrucibleItemWizardDialog({
                   <input value={targetPath} onChange={(e) => setTargetPath(e.target.value)} />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {step === 1 && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Options</h3>
-              <div className="create-section-body">
+          <DialogBody>
+            <DialogPanel title="Options">
+              <div className="dialog-fields">
                 {(
                   [
                     ['optionsCancelDamage', 'Cancel damage', 'Melee hits deal no physical damage'],
@@ -316,15 +298,14 @@ export function CrucibleItemWizardDialog({
                   />
                 </label>
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {step === 2 && (
-          <div className="dialog-fields create-sections">
-            <section className="create-section">
-              <h3 className="create-section-title">Power</h3>
-              <div className="create-section-body">
+          <DialogBody>
+            <DialogPanel title="Power">
+              <div className="dialog-fields">
                 {input.role !== 'socket' && input.role !== 'remover' && (
                   <label className="wide">
                     Stats <span className="field-hint">One per line, e.g. ATTACK_DAMAGE 5 ADDITIVE</span>
@@ -456,16 +437,15 @@ export function CrucibleItemWizardDialog({
                   </>
                 )}
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
         {step === 3 && (
-          <div className="dialog-fields create-sections">
+          <DialogBody>
             {input.itemKind === 'BAG' && (
-              <section className="create-section">
-                <h3 className="create-section-title">Bag inventory</h3>
-                <div className="create-section-body">
+              <DialogPanel title="Bag inventory">
+              <div className="dialog-fields">
                   <label>
                     Size
                     <select
@@ -516,12 +496,11 @@ export function CrucibleItemWizardDialog({
                     />
                   </div>
                 </div>
-              </section>
+              </DialogPanel>
             )}
 
-            <section className="create-section create-section-skills">
-              <div className="create-section-head">
-                <h3 className="create-section-title">Skills</h3>
+            <DialogPanel title="Skills" className="dialog-panel-skills">
+              <div className="dialog-panel-toolbar">
                 <button
                   type="button"
                   className={`slb-open-btn${builderOpen ? ' active' : ''}`}
@@ -530,7 +509,7 @@ export function CrucibleItemWizardDialog({
                   {builderOpen ? 'Hide builder' : 'Build line'}
                 </button>
               </div>
-              <p className="create-section-hint">One skill line per row.</p>
+              <p className="dialog-note">One skill line per row.</p>
               <textarea
                 rows={4}
                 value={input.skills}
@@ -549,11 +528,10 @@ export function CrucibleItemWizardDialog({
                   onClose={() => setBuilderOpen(false)}
                 />
               )}
-            </section>
+            </DialogPanel>
 
-            <section className="create-section">
-              <h3 className="create-section-title">Recipe</h3>
-              <div className="create-section-body">
+            <DialogPanel title="Recipe">
+              <div className="dialog-fields">
                 <label>
                   Recipe type
                   <select
@@ -583,14 +561,14 @@ export function CrucibleItemWizardDialog({
                   </label>
                 ) : null}
               </div>
-            </section>
-          </div>
+            </DialogPanel>
+          </DialogBody>
         )}
 
-        <pre className="wizard-preview">{yaml}</pre>
+        <DialogPreviewBlock code={yaml} />
         {error ? <p className="error-copy">{error}</p> : null}
 
-        <footer className="dialog-actions">
+        <DialogFooter className="wizard-footer">
           <button type="button" onClick={onClose}>Cancel</button>
           {step > 0 ? (
             <button type="button" onClick={() => setStep((s) => s - 1)}>Back</button>
@@ -604,8 +582,7 @@ export function CrucibleItemWizardDialog({
               Create item
             </button>
           )}
-        </footer>
-      </div>
-    </div>
+        </DialogFooter>
+    </DialogShell>
   )
 }

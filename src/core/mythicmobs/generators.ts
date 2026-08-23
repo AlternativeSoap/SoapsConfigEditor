@@ -10,6 +10,57 @@ export function yamlQuoted(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
+/**
+ * Split a Skills textarea into YAML list entries.
+ * Multiline `skill{s=[ ... ]}` blocks stay as one entry: inner `- ` lines are
+ * Mythic array syntax, not separate YAML items.
+ */
+export function skillYamlListEntries(raw: string): string[] {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const entries: string[] = []
+  let buf: string[] = []
+  let depth = 0
+
+  for (const line of lines) {
+    if (buf.length === 0 || depth > 0) {
+      buf.push(line)
+    } else {
+      entries.push(buf.join('\n'))
+      buf = [line]
+    }
+    for (const ch of line) {
+      if (ch === '[') depth += 1
+      else if (ch === ']') depth = Math.max(0, depth - 1)
+    }
+  }
+  if (buf.length > 0) entries.push(buf.join('\n'))
+  return entries
+}
+
+/** Emit a Skills: YAML block. Only the first line of each entry gets a list marker. */
+export function formatSkillsYamlBlock(
+  raw: string,
+  opts: { indent?: string; emptyAsList?: boolean } = {},
+): string {
+  const indent = opts.indent ?? '  '
+  const entries = skillYamlListEntries(raw)
+  if (entries.length === 0) {
+    return opts.emptyAsList ? `${indent}Skills: []` : ''
+  }
+  const lines: string[] = [`${indent}Skills:`]
+  for (const entry of entries) {
+    const parts = entry.split('\n')
+    lines.push(`${indent}- ${parts[0]}`)
+    for (let i = 1; i < parts.length; i++) {
+      lines.push(`${indent}  ${parts[i]}`)
+    }
+  }
+  return lines.join('\n')
+}
+
 function multilineListBlock(key: string, raw: string | undefined): string {
   const lines = (raw ?? '')
     .split('\n')
@@ -20,15 +71,7 @@ function multilineListBlock(key: string, raw: string | undefined): string {
 }
 
 export function generateMobYaml(input: MobGeneratorInput): string {
-  const skills = input.skills
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  const skillBlock =
-    skills.length === 0
-      ? '  Skills: []'
-      : ['  Skills:', ...skills.map((skill) => `    - ${skill}`)].join('\n')
+  const skillBlock = formatSkillsYamlBlock(input.skills, { emptyAsList: true })
 
   const dropLines = input.drops
     .split('\n')
@@ -114,15 +157,7 @@ export function generateSkillYaml(input: SkillGeneratorInput): string {
       ? ''
       : ['  Conditions:', ...conditions.map((c) => `    - ${c}`)].join('\n') + '\n'
 
-  const skills = input.skills
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  const skillsBlock =
-    skills.length === 0
-      ? '  Skills: []'
-      : ['  Skills:', ...skills.map((s) => `    - ${s}`)].join('\n')
+  const skillsBlock = formatSkillsYamlBlock(input.skills, { emptyAsList: true })
 
   const cooldownLine = input.cooldown > 0 ? `  Cooldown: ${input.cooldown}\n` : ''
 

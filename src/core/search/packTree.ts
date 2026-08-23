@@ -15,6 +15,7 @@ export const CATEGORY_LABEL: Record<MythicCategory, string> = {
   quests: 'Quests',
   'equipment-sets': 'Equipment sets',
   augments: 'Augments',
+  packinfo: 'Pack info',
   other: 'Other',
 }
 

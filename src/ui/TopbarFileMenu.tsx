@@ -3,26 +3,34 @@ import { useEffect, useRef, useState } from 'react'
 interface TopbarFileMenuProps {
   startLabel: string
   needsSaveFolder: boolean
+  canExport: boolean
   folderWriteBlocked: boolean
   dirtyCount: number
+  hasActiveFile: boolean
   onOpenFolder: () => void
   onChooseSaveFolder: () => void
   onReconnectFolder: () => void
   onStartNewPack: () => void
   onSaveAll: () => void
+  onExportPack: () => void
+  onExportCurrentFile: () => void
   onChangeWorkspace: () => void
 }
 
 export function TopbarFileMenu({
   startLabel,
   needsSaveFolder,
+  canExport,
   folderWriteBlocked,
   dirtyCount,
+  hasActiveFile,
   onOpenFolder,
   onChooseSaveFolder,
   onReconnectFolder,
   onStartNewPack,
   onSaveAll,
+  onExportPack,
+  onExportCurrentFile,
   onChangeWorkspace,
 }: TopbarFileMenuProps) {
   const [open, setOpen] = useState(false)
@@ -88,6 +96,28 @@ export function TopbarFileMenu({
           <button type="button" className="topbar-menu-item" role="menuitem" onClick={() => pick(onStartNewPack)}>
             {startLabel}…
           </button>
+          {canExport ? (
+            <>
+              <div className="topbar-menu-divider" role="separator" />
+              <button
+                type="button"
+                className={`topbar-menu-item${needsSaveFolder ? ' emphasis' : ''}`}
+                role="menuitem"
+                onClick={() => pick(onExportPack)}
+              >
+                Export pack as ZIP
+              </button>
+              <button
+                type="button"
+                className="topbar-menu-item"
+                role="menuitem"
+                disabled={!hasActiveFile}
+                onClick={() => pick(onExportCurrentFile)}
+              >
+                Export current file
+              </button>
+            </>
+          ) : null}
           <div className="topbar-menu-divider" role="separator" />
           <button
             type="button"

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   defaultMythicLibSkillLore,
   generateMythicLibSkillYaml,
@@ -9,6 +9,14 @@ import {
 import { DAMAGE_TYPE_CHIPS, DEFAULT_ELEMENT_IDS } from '../../data/mmocore/triggers'
 import { extractTopLevelIds, parseYaml } from '../../core/yaml/parseYaml'
 import type { FileRecord, SkillModifierValues } from '../../types'
+import {
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPreviewBlock,
+  DialogShell,
+} from '../DialogShell'
 
 export interface SkillStubOutput {
   files: { path: string; content: string; mode: 'create' | 'append' }[]
@@ -45,14 +53,6 @@ export function CreateMythicLibSkillDialog({
   const [damageTypes, setDamageTypes] = useState('SKILL,MAGIC')
   const [damageElement, setDamageElement] = useState(defaultCategory)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   const skillId = id.trim().toUpperCase().replace(/\s+/g, '_')
   const modifiers: Record<string, SkillModifierValues> = useMemo(() => {
@@ -161,138 +161,151 @@ export function CreateMythicLibSkillDialog({
   }
 
   return (
-    <div className="dialog-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="dialog dialog-lg"
-        role="dialog"
-        aria-labelledby="ml-skill-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-header-row">
-          <h2 id="ml-skill-title">New MythicLib skill</h2>
-          <button type="button" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        <div className="dialog-fields">
-          <p>
-            Registers a MythicLib skill with <code>source: mythicmobs:ID</code> and a castable
-            MythicMobs stub using typed elemental mmodamage. Example: STORM_BOLT.
-          </p>
-          <label>
-            Skill id
-            <input value={id} onChange={(e) => setId(e.target.value)} placeholder="STORM_BOLT" />
-          </label>
-          <label>
-            Display name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label>
-            Categories
-            <input value={categories} onChange={(e) => setCategories(e.target.value)} />
-          </label>
-          <label>
-            Icon
-            <input value={icon} onChange={(e) => setIcon(e.target.value)} />
-          </label>
-          <label>
-            Damage base
-            <input
-              type="number"
-              value={damage}
-              onChange={(e) => {
-                const n = Number(e.target.value)
-                setDamage(n)
-                setItemScaling(n)
-              }}
-            />
-          </label>
-          <label>
-            Per level
-            <input
-              type="number"
-              step="any"
-              value={damagePer}
-              onChange={(e) => setDamagePer(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Duration base (optional)
-            <input
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Duration per level
-            <input
-              type="number"
-              step="any"
-              value={durationPer}
-              onChange={(e) => setDurationPer(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Item scaling
-            <input
-              type="number"
-              step="any"
-              value={itemScaling}
-              onChange={(e) => setItemScaling(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Damage types
-            <input value={damageTypes} onChange={(e) => setDamageTypes(e.target.value)} />
-          </label>
-          <div className="attr-picker">
-            {DAMAGE_TYPE_CHIPS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="chip"
-                onClick={() => {
-                  const cur = new Set(
-                    damageTypes
-                      .split(/[,\s]+/)
-                      .map((x) => x.trim().toUpperCase())
-                      .filter(Boolean),
-                  )
-                  if (cur.has(t)) cur.delete(t)
-                  else cur.add(t)
-                  setDamageTypes([...cur].join(','))
-                }}
-              >
-                {t}
-              </button>
-            ))}
+    <DialogShell size="lg" labelledBy="ml-skill-title" onClose={onClose}>
+      <DialogHeader
+        title="New MythicLib skill"
+        titleId="ml-skill-title"
+        onClose={onClose}
+        lead="Registers a MythicLib skill with source mythicmobs:ID and a castable MythicMobs stub using typed elemental damage."
+      />
+
+      <DialogBody>
+        <DialogPanel title="Identity">
+          <div className="dialog-fields">
+            <label>
+              Skill id
+              <input value={id} onChange={(e) => setId(e.target.value)} placeholder="STORM_BOLT" />
+            </label>
+            <label>
+              Display name
+              <input value={name} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <label>
+              Categories
+              <input value={categories} onChange={(e) => setCategories(e.target.value)} />
+            </label>
+            <label>
+              Icon
+              <input value={icon} onChange={(e) => setIcon(e.target.value)} />
+            </label>
           </div>
-          <label>
-            Damage element
-            <input
-              list="ml-dmg-el"
-              value={damageElement}
-              onChange={(e) => setDamageElement(e.target.value)}
-            />
-            <datalist id="ml-dmg-el">
-              {DEFAULT_ELEMENT_IDS.map((el) => (
-                <option key={el} value={el} />
-              ))}
-            </datalist>
-          </label>
-          {error ? <p className="error-copy">{error}</p> : null}
-          <pre className="dialog-preview">{preview}</pre>
-        </div>
-        <div className="dialog-actions">
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="primary" onClick={submit}>
-            Create skill files
-          </button>
-        </div>
-      </div>
-    </div>
+        </DialogPanel>
+
+        <DialogPanel title="Modifiers">
+          <div className="dialog-fields">
+            <label>
+              Damage base
+              <input
+                type="number"
+                value={damage}
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  setDamage(n)
+                  setItemScaling(n)
+                }}
+              />
+            </label>
+            <label>
+              Per level
+              <input
+                type="number"
+                step="any"
+                value={damagePer}
+                onChange={(e) => setDamagePer(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Duration base
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Duration per level
+              <input
+                type="number"
+                step="any"
+                value={durationPer}
+                onChange={(e) => setDurationPer(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Item scaling
+              <input
+                type="number"
+                step="any"
+                value={itemScaling}
+                onChange={(e) => setItemScaling(Number(e.target.value))}
+              />
+            </label>
+          </div>
+        </DialogPanel>
+
+        <DialogPanel title="Damage">
+          <div className="dialog-fields">
+            <label>
+              Damage types
+              <input value={damageTypes} onChange={(e) => setDamageTypes(e.target.value)} />
+            </label>
+            <label>
+              Damage element
+              <input
+                list="ml-dmg-el"
+                value={damageElement}
+                onChange={(e) => setDamageElement(e.target.value)}
+              />
+              <datalist id="ml-dmg-el">
+                {DEFAULT_ELEMENT_IDS.map((el) => (
+                  <option key={el} value={el} />
+                ))}
+              </datalist>
+            </label>
+            <div className="attr-picker">
+              {DAMAGE_TYPE_CHIPS.map((t) => {
+                const active = damageTypes
+                  .split(/[,\s]+/)
+                  .map((x) => x.trim().toUpperCase())
+                  .filter(Boolean)
+                  .includes(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    className={active ? 'chip active' : 'chip'}
+                    onClick={() => {
+                      const cur = new Set(
+                        damageTypes
+                          .split(/[,\s]+/)
+                          .map((x) => x.trim().toUpperCase())
+                          .filter(Boolean),
+                      )
+                      if (cur.has(t)) cur.delete(t)
+                      else cur.add(t)
+                      setDamageTypes([...cur].join(','))
+                    }}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </DialogPanel>
+
+        {error ? <p className="error-copy">{error}</p> : null}
+        <DialogPreviewBlock code={preview} />
+      </DialogBody>
+
+      <DialogFooter>
+        <button type="button" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="primary" onClick={submit}>
+          Create skill files
+        </button>
+      </DialogFooter>
+    </DialogShell>
   )
 }
