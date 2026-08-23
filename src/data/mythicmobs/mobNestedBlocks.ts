@@ -201,7 +201,7 @@ export const CLASS_RESOURCE_DEFS: BodyKeyDef[] = [
 
 export const CLASS_RESOURCE_BAR_DEFS: BodyKeyDef[] = [
   scalarKey('type', 'LINEAR or INTEGER'),
-  mapKey('value', 'Resource values', 8),
+  mapKey('value', 'Resource values', 12),
   boolKey('off-combat', true, 'Regen out of combat'),
 ]
 
@@ -220,11 +220,24 @@ export const CLASS_SKILL_BINDING_DEFS: BodyKeyDef[] = [
   scalarKey('timer', 'Timer interval when trigger is TIMER'),
 ]
 
+export const CLASS_ATTRIBUTE_VALUE_DEFS: BodyKeyDef[] = [
+  scalarKey('base', 'Base value'),
+  scalarKey('per-level', 'Per-level gain'),
+  scalarKey('min', 'Minimum value'),
+  scalarKey('max', 'Maximum value'),
+]
+
 export const CLASS_MANA_DEFS: BodyKeyDef[] = [
   scalarKey('char', 'Mana bar character'),
   scalarKey('icon', 'Mana icon'),
   mapKey('color', 'Bar colors', 8),
   scalarKey('name', 'Mana display name'),
+]
+
+export const CLASS_MANA_COLOR_DEFS: BodyKeyDef[] = [
+  scalarKey('full', 'Full bar color'),
+  scalarKey('half', 'Half bar color'),
+  scalarKey('empty', 'Empty bar color'),
 ]
 
 export const MYTHICLIB_SKILL_BODY_DEFS: BodyKeyDef[] = [
@@ -329,8 +342,11 @@ export const CLASS_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
   options: mapBlock('options', CLASS_OPTIONS_DEFS, 4),
   resource: mapBlock('resource', CLASS_RESOURCE_DEFS, 4),
   health: mapBlock('health', CLASS_RESOURCE_BAR_DEFS, 8),
-  mana: mapBlock('mana', CLASS_RESOURCE_BAR_DEFS, 8),
-  value: mapBlock('value', CLASS_RESOURCE_VALUE_DEFS, 8),
+  // Root `mana:` display block (indent 4). Resource `mana:` under resource: is
+  // handled specially in nestedYamlCompletions via CLASS_RESOURCE_BAR_DEFS.
+  mana: mapBlock('mana', CLASS_MANA_DEFS, 4),
+  color: mapBlock('color', CLASS_MANA_COLOR_DEFS, 8),
+  value: mapBlock('value', CLASS_RESOURCE_VALUE_DEFS, 12),
 }
 
 export const CRUCIBLE_ITEM_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
@@ -378,6 +394,37 @@ export function nestedBlocksForCategory(
     default:
       return {}
   }
+}
+
+/** Prefer category blocks; fall back so parent-key completions work if classification is wrong. */
+export function resolveNestedBlock(
+  parentKey: string,
+  category?: string,
+  crucible = false,
+): NestedBlockDef | null {
+  const primary = nestedBlocksForCategory(category, crucible)
+  if (primary[parentKey]) return primary[parentKey]
+
+  const fallbacks: Record<string, NestedBlockDef>[] = [
+    MOB_NESTED_BLOCKS,
+    SPELL_NESTED_BLOCKS,
+    ARCHETYPE_NESTED_BLOCKS,
+    STAT_NESTED_BLOCKS,
+    ELEMENT_NESTED_BLOCKS,
+    REAGENT_NESTED_BLOCKS,
+    AUGMENT_NESTED_BLOCKS,
+    EXPERIENCE_SOURCE_NESTED_BLOCKS,
+    EQUIPMENT_SET_NESTED_BLOCKS,
+    QUEST_NESTED_BLOCKS,
+    DIFFICULTY_NESTED_BLOCKS,
+    CLASS_NESTED_BLOCKS,
+  ]
+  if (crucible) fallbacks.push(CRUCIBLE_ITEM_NESTED_BLOCKS)
+
+  for (const source of fallbacks) {
+    if (source[parentKey]) return source[parentKey]
+  }
+  return null
 }
 
 export { BOSS_BAR_COLORS, BOSS_BAR_STYLES, EXPERIENCE_SOURCE_TYPES }

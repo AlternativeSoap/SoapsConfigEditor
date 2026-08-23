@@ -14,6 +14,9 @@ const CATEGORY_FOLDERS: Record<string, MythicCategory> = {
 export function classifyMythicCategory(filePath: string): MythicCategory {
   const normalized = filePath.replace(/\\/g, '/')
   const baseName = normalized.split('/').pop()?.toLowerCase() ?? ''
+  if (baseName === 'mobs.yml' || baseName.startsWith('mobs.')) {
+    return 'mobs'
+  }
   if (baseName === 'reagents.yml' || baseName.startsWith('reagents.')) {
     return 'reagents'
   }

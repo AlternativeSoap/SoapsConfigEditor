@@ -9,6 +9,7 @@ import {
 
 /** List block that uses `- entry` lines (DamageModifiers, KillMessages). */
 function listDashKey(key: string, detail?: string, starter = ''): BodyKeyDef {
+  // Mythic style: list dashes share indent with the key (not nested further).
   return { key, detail, apply: `${key}:\n  - ${starter}` }
 }
 
@@ -20,13 +21,13 @@ export const MOB_BODY_DEFS: BodyKeyDef[] = [
   scalarKey('Armor', 'Armor value'),
   scalarKey('Faction', 'Faction id'),
   scalarKey('Template', 'Inherit from mob'),
-  listKey('Exclude', 'Keys to exclude from template'),
-  listKey('Skills', 'Skill lines'),
-  listKey('Drops', 'Drop table entries'),
+  listDashKey('Exclude', 'Keys to exclude from template'),
+  listDashKey('Skills', 'Skill lines'),
+  listDashKey('Drops', 'Drop table entries'),
   mapKey('Equipment', 'Slot to item id', 4),
   mapKey('Options', 'Mob options', 4),
-  listKey('AIGoalSelectors', 'AI goals'),
-  listKey('AITargetSelectors', 'AI targets'),
+  listDashKey('AIGoalSelectors', 'AI goals'),
+  listDashKey('AITargetSelectors', 'AI targets'),
   mapKey('Modules', 'Module toggles', 4),
   scalarKey('Level', 'Mob level'),
   listDashKey('KillMessages', 'Death message lines'),
@@ -38,8 +39,8 @@ export const MOB_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const SKILL_BODY_DEFS: BodyKeyDef[] = [
-  listKey('Skills', 'Skill lines'),
-  listKey('Conditions', 'Conditions'),
+  listDashKey('Skills', 'Skill lines'),
+  listDashKey('Conditions', 'Conditions'),
   scalarKey('Cooldown', 'Cooldown seconds'),
   mapKey('Options', 'Skill options', 4),
   scalarKey('OnCooldownSkill', 'Skill while on cooldown'),
@@ -65,9 +66,9 @@ export const SPELL_BODY_DEFS: BodyKeyDef[] = [
 /** MythicLib skill registration keys (plugins/MythicLib/skill/). */
 export const MYTHICLIB_SKILL_BODY_DEFS: BodyKeyDef[] = [
   mapKey('parameters', 'Skill parameters', 4),
-  listKey('categories', 'Skill categories'),
+  listDashKey('categories', 'Skill categories'),
   scalarKey('name', 'Skill display name'),
-  listKey('lore', 'Skill lore lines'),
+  listDashKey('lore', 'Skill lore lines'),
   mapKey('icon', 'Icon material', 4),
   scalarKey('source', 'MythicMobs skill source id'),
   scalarKey('trigger', 'Skill trigger'),
@@ -77,16 +78,16 @@ export const ITEM_BODY_DEFS: BodyKeyDef[] = [
   scalarKey('Id', 'Material id'),
   scalarKey('Display', 'Item name'),
   mapKey('Options', 'Item options', 4),
-  listKey('Lore', 'Lore lines'),
+  listDashKey('Lore', 'Lore lines'),
   mapKey('NBT', 'NBT data'),
-  listKey('Skills', 'Skill lines'),
-  listKey('Enchantments', 'Enchantments'),
+  listDashKey('Skills', 'Skill lines'),
+  listDashKey('Enchantments', 'Enchantments'),
   scalarKey('Model', 'Custom model data'),
 ]
 
 export const DROPTABLE_BODY_DEFS: BodyKeyDef[] = [
-  listKey('Drops', 'Drop entries'),
-  listKey('Conditions', 'Conditions'),
+  listDashKey('Drops', 'Drop entries'),
+  listDashKey('Conditions', 'Conditions'),
   scalarKey('TotalItems', 'Total items to roll'),
   scalarKey('MinItems', 'Minimum items'),
   scalarKey('MaxItems', 'Maximum items'),
@@ -97,9 +98,9 @@ export const RANDOMSPAWN_BODY_DEFS: BodyKeyDef[] = [
   scalarKey('Type', 'Mob or entity type'),
   scalarKey('Level', 'Mob level'),
   scalarKey('Chance', 'Spawn chance'),
-  listKey('Worlds', 'World names'),
-  listKey('Biomes', 'Biome names'),
-  listKey('Conditions', 'Spawn conditions'),
+  listDashKey('Worlds', 'World names'),
+  listDashKey('Biomes', 'Biome names'),
+  listDashKey('Conditions', 'Spawn conditions'),
   scalarKey('Priority', 'Spawn priority'),
 ]
 
@@ -160,7 +161,7 @@ export const QUEST_BODY_DEFS: BodyKeyDef[] = [
   boolKey('sequential', false, 'Sequential objectives'),
   boolKey('lock-to-player', false, 'Lock to player'),
   mapKey('conditions', 'Unlock conditions', 4),
-  mapKey('objectives', 'Objective list', 4),
+  { key: 'objectives', detail: 'Objective list', apply: 'objectives:\n    - type: ' },
   mapKey('reward', 'Rewards', 4),
 ]
 
@@ -264,7 +265,9 @@ export function bodyKeyIndentForCategory(category?: MythicCategory): number | nu
     case 'augments':
     case 'stats':
     case 'experience-curves':
+    case 'exp-curves':
     case 'experience-sources':
+    case 'other':
       return 2
     case 'quests':
     case 'tiers':
@@ -285,6 +288,7 @@ export function bodyKeyDefsForCategory(
 ): BodyKeyDef[] {
   switch (category) {
     case 'mobs':
+    case 'other':
       return MOB_BODY_DEFS
     case 'skills': {
       const seen = new Set<string>()
@@ -324,6 +328,7 @@ export function bodyKeyDefsForCategory(
     case 'stats':
       return STAT_BODY_DEFS
     case 'experience-curves':
+    case 'exp-curves':
       return EXPERIENCE_CURVE_BODY_DEFS
     case 'experience-sources':
       return EXPERIENCE_SOURCE_BODY_DEFS

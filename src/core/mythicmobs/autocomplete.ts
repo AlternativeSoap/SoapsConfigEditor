@@ -38,17 +38,26 @@ import {
   DROP_BUILTIN_APPLY,
   EQUIPMENT_SLOTS,
   findNearestYamlParentKey,
+  hasYamlAncestorKey,
   isConditionsListParent,
+  isMobStructureListParent,
   isSkillsListParent,
   MOB_BODY_DEFS,
 } from './yamlEditContext'
+import { DAMAGE_MODIFIER_TYPES, damageModifierApply } from '../../data/mythicmobs/damageTypes'
 import type { BodyKeyDef } from '../yaml/bodyKeyDefs'
 import { CRUCIBLE_OPTION_DEFS } from '../yaml/bodyKeyCatalogs'
 import { fieldCompletions } from '../yaml/bodyKeyDefs'
 import { BOOLEAN_VALUES } from './attrValueCompletions'
 import { AI_GOAL_SELECTORS, AI_TARGET_SELECTORS } from '../../data/mythicmobs/mobAiSelectors'
 import { MOB_OPTION_NAMES, mobOptionByName, type MobOptionEntry } from '../../data/mythicmobs/mobOptions'
-import { nestedBlocksForCategory, type NestedBlockDef, CLASS_SKILL_BINDING_DEFS } from '../../data/mythicmobs/mobNestedBlocks'
+import {
+  resolveNestedBlock,
+  type NestedBlockDef,
+  CLASS_ATTRIBUTE_VALUE_DEFS,
+  CLASS_RESOURCE_BAR_DEFS,
+  CLASS_SKILL_BINDING_DEFS,
+} from '../../data/mythicmobs/mobNestedBlocks'
 import { ALL_OBJECTIVE_TYPES } from '../../data/soapsquest/objectiveTypes'
 import {
   BOSS_BAR_COLORS,
@@ -71,27 +80,35 @@ function collectSiblingMapKeys(
   const present = new Set<string>()
   let optionsIndent = -1
   for (let i = lineNumber; i >= 1; i--) {
-    const text = doc.line(i).text
-    const ind = text.match(/^(\s*)/)?.[1]?.length ?? 0
-    if (/^\s*Options:\s*(?:#.*)?$/.test(text)) {
-      optionsIndent = ind
+    const lineText = doc.line(i).text
+    if (/^\s*Options:\s*(?:#.*)?$/.test(lineText)) {
+      optionsIndent = lineText.match(/^(\s*)/)?.[1]?.length ?? 0
       break
     }
   }
   if (optionsIndent < 0) return present
-  const childIndent = optionsIndent + 2
+
+  const lineIndent = doc.line(lineNumber).text.match(/^(\s*)/)?.[1]?.length ?? 0
+  const bodyKeys = new Set(MOB_BODY_DEFS.map((d) => d.key))
   let started = false
   for (let i = 1; i <= doc.lines; i++) {
-    const text = doc.line(i).text
-    const ind = text.match(/^(\s*)/)?.[1]?.length ?? 0
-    if (/^\s*Options:\s*(?:#.*)?$/.test(text)) {
+    const lineText = doc.line(i).text
+    const ind = lineText.match(/^(\s*)/)?.[1]?.length ?? 0
+    if (/^\s*Options:\s*(?:#.*)?$/.test(lineText) && ind === optionsIndent) {
       started = true
       continue
     }
     if (!started) continue
-    if (ind <= optionsIndent && text.trim() && !text.trim().startsWith('#')) break
-    if (ind === childIndent && i !== lineNumber) {
-      const m = /^\s*([A-Za-z][A-Za-z0-9_]*):/.exec(text)
+    if (ind < optionsIndent && lineText.trim()) break
+    // Nested Options: a peer body key at Options indent ends the block.
+    if (lineIndent > optionsIndent && ind === optionsIndent && lineText.trim()) break
+    // Same-indent Options: stop at the next mob body key (Skills, Type, ...).
+    if (lineIndent === optionsIndent && ind === optionsIndent) {
+      const m = /^\s*([A-Za-z][A-Za-z0-9_]*):/.exec(lineText)
+      if (m?.[1] && bodyKeys.has(m[1]) && m[1] !== 'Options') break
+    }
+    if (ind === lineIndent && i !== lineNumber) {
+      const m = /^\s*([A-Za-z][A-Za-z0-9_]*):/.exec(lineText)
       if (m?.[1]) present.add(m[1])
     }
   }
@@ -123,6 +140,16 @@ function bodyKeyPattern(indent: number): RegExp {
   return new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`)
 }
 
+function damageModifierListCompletions(typed: string, from: number): CompletionResult | null {
+  const options: Completion[] = DAMAGE_MODIFIER_TYPES.map((t) => ({
+    label: t,
+    type: 'enum' as const,
+    detail: 'damage modifier',
+    apply: damageModifierApply(t, '1'),
+  }))
+  return completionResult(from, filterByPrefix(options, typed), /^[A-Za-z0-9_]*$/)
+}
+
 function nestedListDashCompletions(
   block: NestedBlockDef,
   typed: string,
@@ -148,9 +175,10 @@ function nestedMapCompletions(
   block: NestedBlockDef,
   typed: string,
   from: number,
+  siblingIndent = block.childIndent,
 ): CompletionResult | null {
   const defs = block.entries as BodyKeyDef[]
-  const present = collectSiblingBodyKeys(doc, lineNumber, block.childIndent)
+  const present = collectSiblingBodyKeys(doc, lineNumber, siblingIndent)
   const options = fieldCompletions(defs.filter((d) => !present.has(d.key)))
   return completionResult(from, filterByPrefix(options, typed), /^[A-Za-z][A-Za-z0-9_-]*$/)
 }
@@ -163,38 +191,78 @@ function nestedYamlCompletions(
   lineIndent: number,
   crucible = false,
 ): CompletionResult | null {
-  const blocks = nestedBlocksForCategory(fileCategory, crucible)
-  if (Object.keys(blocks).length === 0 && fileCategory !== 'classes') return null
+  const parent = findNearestYamlParentKey(context.state.doc, lineNumber, lineIndent)
 
+  // MMOCore class indent-8: attribute values and skill bindings only under those sections.
   if (fileCategory === 'classes' && lineIndent === 8) {
     const keyMatch = /^\s{8}([a-z][a-z0-9-]*)$/.exec(before)
     if (keyMatch) {
       const typed = keyMatch[1] ?? ''
-      const present = collectSiblingBodyKeys(context.state.doc, lineNumber, 8)
-      const options = fieldCompletions(
-        CLASS_SKILL_BINDING_DEFS.filter((d) => !present.has(d.key)),
-      )
-      return completionResult(context.pos - typed.length, filterByPrefix(options, typed), /^[a-z][a-z0-9-]*$/)
+      const from = context.pos - typed.length
+      if (hasYamlAncestorKey(context.state.doc, lineNumber, 8, 'attributes')) {
+        const present = collectSiblingBodyKeys(context.state.doc, lineNumber, 8)
+        const options = fieldCompletions(
+          CLASS_ATTRIBUTE_VALUE_DEFS.filter((d) => !present.has(d.key)),
+        )
+        return completionResult(from, filterByPrefix(options, typed), /^[a-z][a-z0-9-]*$/)
+      }
+      if (hasYamlAncestorKey(context.state.doc, lineNumber, 8, 'skills')) {
+        const present = collectSiblingBodyKeys(context.state.doc, lineNumber, 8)
+        const options = fieldCompletions(
+          CLASS_SKILL_BINDING_DEFS.filter((d) => !present.has(d.key)),
+        )
+        return completionResult(from, filterByPrefix(options, typed), /^[a-z][a-z0-9-]*$/)
+      }
     }
   }
 
-  const parent = findNearestYamlParentKey(context.state.doc, lineNumber, lineIndent)
   if (!parent) return null
 
-  const block = blocks[parent]
+  // resource.mana uses the same parent key as root mana:; prefer resource bar keys
+  // when under resource: at indent 8.
+  if (
+    fileCategory === 'classes' &&
+    parent === 'mana' &&
+    (lineIndent === 8 || lineIndent === 6) &&
+    hasYamlAncestorKey(context.state.doc, lineNumber, lineIndent, 'resource')
+  ) {
+    const indents = [8, 6]
+    for (const indent of indents) {
+      const keyMatch = new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
+      if (keyMatch && lineIndent === indent) {
+        const typed = keyMatch[1] ?? ''
+        return nestedMapCompletions(
+          context.state.doc,
+          lineNumber,
+          { parentKey: 'mana', kind: 'map', childIndent: 8, entries: CLASS_RESOURCE_BAR_DEFS },
+          typed,
+          context.pos - typed.length,
+          indent,
+        )
+      }
+    }
+  }
+
+  const block = resolveNestedBlock(parent, fileCategory, crucible)
   if (!block) return null
 
   if (block.kind === 'map') {
-    const keyMatch = new RegExp(`^\\s{${block.childIndent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
-    if (keyMatch && lineIndent === block.childIndent) {
-      const typed = keyMatch[1] ?? ''
-      return nestedMapCompletions(
-        context.state.doc,
-        lineNumber,
-        block,
-        typed,
-        context.pos - typed.length,
-      )
+    // Nested children (childIndent) or Mythic same-indent siblings (childIndent - 2).
+    const indents = [block.childIndent]
+    if (block.childIndent >= 2) indents.push(block.childIndent - 2)
+    for (const indent of indents) {
+      const keyMatch = new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
+      if (keyMatch && lineIndent === indent) {
+        const typed = keyMatch[1] ?? ''
+        return nestedMapCompletions(
+          context.state.doc,
+          lineNumber,
+          block,
+          typed,
+          context.pos - typed.length,
+          indent,
+        )
+      }
     }
     return null
   }
@@ -245,24 +313,25 @@ function nestedEnumValueCompletions(
     return completionResult(context.pos - typed.length, filterByPrefix(options, typed), validFor)
   }
 
-  if (fileCategory === 'mobs' && parent === 'BossBar') {
+  if (parent === 'BossBar') {
     const color = scalarEnum(/^\s+Color:\s+([A-Za-z_]*)$/, BOSS_BAR_COLORS, /^[A-Za-z_]*$/)
     if (color) return color
     const style = scalarEnum(/^\s+Style:\s+([A-Za-z0-9_]*)$/, BOSS_BAR_STYLES, /^[A-Za-z0-9_]*$/)
     if (style) return style
   }
 
-  if (fileCategory === 'experience-curves') {
-    const curveType = scalarEnum(/^\s+Type:\s+([A-Za-z_]*)$/, EXPERIENCE_CURVE_TYPES, /^[A-Za-z_]*$/)
-    if (curveType) return curveType
+  if (parent === 'Sources' || fileCategory === 'experience-curves' || fileCategory === 'exp-curves') {
+    if (fileCategory === 'experience-curves' || fileCategory === 'exp-curves' || parent === 'Sources') {
+      const curveOrSrc = scalarEnum(
+        /^\s+Type:\s+([A-Za-z_]*)$/,
+        parent === 'Sources' ? EXPERIENCE_SOURCE_TYPES : EXPERIENCE_CURVE_TYPES,
+        /^[A-Za-z_]*$/,
+      )
+      if (curveOrSrc) return curveOrSrc
+    }
   }
 
-  if (fileCategory === 'experience-sources' && parent === 'Sources') {
-    const srcType = scalarEnum(/^\s+Type:\s+([A-Za-z_]*)$/, EXPERIENCE_SOURCE_TYPES, /^[A-Za-z_]*$/)
-    if (srcType) return srcType
-  }
-
-  if (fileCategory === 'quests') {
+  if (fileCategory === 'quests' || parent === 'objectives') {
     const objType = scalarEnum(
       /type:\s+([\w-]*)$/,
       ALL_OBJECTIVE_TYPES.map((t) => t.id),
@@ -271,9 +340,12 @@ function nestedEnumValueCompletions(
     if (objType) return objType
   }
 
-  if (fileCategory === 'archetypes') {
-    const group = scalarEnum(/^\s+Group:\s+([A-Za-z_]*)$/, ARCHETYPE_GROUPS, /^[A-Za-z_]*$/)
-    if (group) return group
+  {
+    // Archetype Group — skip item files (Crucible also has Group:)
+    if (fileCategory !== 'items') {
+      const group = scalarEnum(/^\s+Group:\s+([A-Za-z_]*)$/, ARCHETYPE_GROUPS, /^[A-Za-z_]*$/)
+      if (group) return group
+    }
   }
 
   return null
@@ -555,6 +627,12 @@ function yamlStructureCompletions(
   )
   if (nestedResult) return nestedResult
 
+  const dmgModListMatch = /^\s+-\s+([A-Za-z0-9_]*)$/.exec(before)
+  if (dmgModListMatch && yamlCtx.parentKey === 'DamageModifiers') {
+    const typed = dmgModListMatch[1] ?? ''
+    return damageModifierListCompletions(typed, context.pos - typed.length)
+  }
+
   const enumValueResult = nestedEnumValueCompletions(
     context,
     before,
@@ -567,7 +645,8 @@ function yamlStructureCompletions(
   const bodyIndent = bodyKeyIndentForCategory(fileCategory)
   if (bodyIndent !== null) {
     const bodyKeyMatch = bodyKeyPattern(bodyIndent).exec(before)
-    if (bodyKeyMatch && yamlCtx.lineIndent === bodyIndent) {
+    // Skip when inside a nested block (Options, BossBar, ...) at the same indent.
+    if (bodyKeyMatch && yamlCtx.lineIndent === bodyIndent && !yamlCtx.parentKey) {
       const typed = bodyKeyMatch[1] ?? ''
       const defs = bodyKeyDefsForCategory(fileCategory, crucible)
       if (defs.length) {
@@ -582,21 +661,26 @@ function yamlStructureCompletions(
     }
   }
 
-  // Crucible Options keys under Options:
-  if (crucible && fileCategory === 'items' && yamlCtx.parentKey === 'Options') {
-    const optMatch = /^\s{4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
-    if (optMatch) {
+  // Crucible Options keys under Options: (items, or misclassified other)
+  if (
+    crucible &&
+    yamlCtx.parentKey === 'Options' &&
+    (fileCategory === 'items' || fileCategory === 'other' || fileCategory === undefined)
+  ) {
+    const optMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
+    if (optMatch && (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 4)) {
       const typed = optMatch[1] ?? ''
       const lineNo = context.state.doc.lineAt(context.pos).number
       const present = collectSiblingMapKeys(context.state.doc, lineNo)
       const filtered = CRUCIBLE_OPTION_DEFS.filter((d) => !present.has(d.key))
       const options = fieldCompletions(filtered)
-      return completionResult(context.pos - typed.length, filterByPrefix(options, typed), /^[A-Za-z][A-Za-z0-9_]*$/)
+      const result = completionResult(context.pos - typed.length, filterByPrefix(options, typed), /^[A-Za-z][A-Za-z0-9_]*$/)
+      if (result) return result
     }
   }
 
   // EquipmentSet: pack set ids
-  if (crucible && prefs.packIds && fileCategory === 'items') {
+  if (crucible && prefs.packIds && (fileCategory === 'items' || fileCategory === 'other' || fileCategory === undefined)) {
     const setMatch = /^\s+EquipmentSet:\s+([A-Za-z0-9_]*)$/.exec(before)
     if (setMatch) {
       const typed = setMatch[1] ?? ''
@@ -609,7 +693,7 @@ function yamlStructureCompletions(
   }
 
   // Augment Type: under Augmentation* blocks
-  if (crucible && prefs.packIds && fileCategory === 'items') {
+  if (crucible && prefs.packIds && (fileCategory === 'items' || fileCategory === 'other' || fileCategory === undefined)) {
     const typeMatch = /^\s+Type:\s+([A-Za-z0-9_]*)$/.exec(before)
     if (typeMatch) {
       const lineNum = context.state.doc.lineAt(context.pos).number
@@ -628,10 +712,15 @@ function yamlStructureCompletions(
     }
   }
 
-  // Mob Options map keys / values under Options:
-  if (fileCategory === 'mobs' && yamlCtx.parentKey === 'Options') {
-    const optKeyMatch = /^\s{4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
-    if (optKeyMatch && yamlCtx.lineIndent === 4) {
+  // Mob Options map keys / values under Options: (parent-key; works if category is wrong)
+  if (
+    yamlCtx.parentKey === 'Options' &&
+    fileCategory !== 'items' &&
+    fileCategory !== 'skills' &&
+    !(crucible && (fileCategory === 'other' || fileCategory === undefined))
+  ) {
+    const optKeyMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
+    if (optKeyMatch && (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 4)) {
       const typed = optKeyMatch[1] ?? ''
       const lineNo = context.state.doc.lineAt(context.pos).number
       const present = collectSiblingMapKeys(context.state.doc, lineNo)
@@ -640,7 +729,7 @@ function yamlStructureCompletions(
       return completionResult(context.pos - typed.length, filterByPrefix(options, typed), /^[A-Za-z][A-Za-z0-9_]*$/)
     }
 
-    const optValMatch = /^\s{4}([A-Za-z][A-Za-z0-9_]*):\s*(.*)$/.exec(before)
+    const optValMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*):\s*(.*)$/.exec(before)
     if (optValMatch) {
       const optName = optValMatch[1] ?? ''
       const typed = optValMatch[2] ?? ''
@@ -662,10 +751,10 @@ function yamlStructureCompletions(
     }
   }
 
-  // Equipment slot keys
-  if (fileCategory === 'mobs' && yamlCtx.parentKey === 'Equipment') {
-    const slotKeyMatch = /^\s{4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
-    if (slotKeyMatch && yamlCtx.lineIndent === 4) {
+  // Equipment slot keys (parent-key; Mythic same-indent or nested)
+  if (yamlCtx.parentKey === 'Equipment' && fileCategory !== 'items') {
+    const slotKeyMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
+    if (slotKeyMatch && (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 4)) {
       const typed = slotKeyMatch[1] ?? ''
       const options: Completion[] = EQUIPMENT_SLOTS.map((k) => ({
         label: k,
@@ -678,7 +767,7 @@ function yamlStructureCompletions(
   }
 
   // Equipment slot values
-  const equipMatch = new RegExp(`^\\s{4}(${EQUIPMENT_SLOTS.join('|')}):\\s*([A-Za-z0-9_]*)$`).exec(before)
+  const equipMatch = new RegExp(`^\\s{2,4}(${EQUIPMENT_SLOTS.join('|')}):\\s*([A-Za-z0-9_]*)$`).exec(before)
   if (equipMatch && yamlCtx.parentKey === 'Equipment') {
     const typed = equipMatch[2] ?? ''
     const opts = [...packCompletions(packItemIds, 'pack item')]
@@ -705,8 +794,8 @@ function yamlStructureCompletions(
   // Mob Skills list: metaskill IDs; lowercase typing also offers inline mechanics
   const listMatch = /^\s+-\s+([A-Za-z0-9_]*)$/.exec(before)
 
-  // AIGoalSelectors / AITargetSelectors list items
-  if (listMatch && fileCategory === 'mobs') {
+  // AIGoalSelectors / AITargetSelectors — parent-key only (Mythic same-indent lists)
+  if (listMatch) {
     if (yamlCtx.parentKey === 'AIGoalSelectors') {
       const typed = listMatch[1] ?? ''
       const options: Completion[] = AI_GOAL_SELECTORS.map((k) => ({
@@ -729,11 +818,11 @@ function yamlStructureCompletions(
     }
   }
 
-  if (listMatch && isSkillsListParent(yamlCtx.parentKey) && fileCategory === 'mobs') {
+  // Mob Skills list (not skill-file Skills: mechanics lists)
+  if (listMatch && isSkillsListParent(yamlCtx.parentKey) && fileCategory !== 'skills') {
     const typed = listMatch[1] ?? ''
     const skillOpts = filterByPrefix(packCompletions(packSkillIds, 'skill'), typed)
-    const looksLikeMechanic = typed.length > 0 && typed === typed.toLowerCase()
-    if (looksLikeMechanic && prefs.mechanics) {
+    if (prefs.mechanics) {
       const mechOpts = filterByPrefix(completions.mechanics, typed)
       return completionResult(
         context.pos - typed.length,
@@ -744,12 +833,8 @@ function yamlStructureCompletions(
     return completionResult(context.pos - typed.length, skillOpts, /^[A-Za-z0-9_]*$/)
   }
 
-  // Conditions block in skill, droptable, and randomspawn files
-  if (
-    listMatch &&
-    isConditionsListParent(yamlCtx.parentKey) &&
-    (fileCategory === 'skills' || fileCategory === 'droptables' || fileCategory === 'randomspawns')
-  ) {
+  // Conditions block — parent Conditions: is enough
+  if (listMatch && isConditionsListParent(yamlCtx.parentKey)) {
     const typed = listMatch[1] ?? ''
     return completionResult(
       context.pos - typed.length,
@@ -760,7 +845,7 @@ function yamlStructureCompletions(
 
   // Mob Template: pack mob ids
   const templateMatch = /^\s+Template:\s*([A-Za-z0-9_,\s]*)$/.exec(before)
-  if (templateMatch && fileCategory === 'mobs') {
+  if (templateMatch && (fileCategory === 'mobs' || fileCategory === 'other' || fileCategory === undefined)) {
     const raw = templateMatch[1] ?? ''
     const afterComma = raw.includes(',') ? raw.slice(raw.lastIndexOf(',') + 1).trimStart() : raw.trimStart()
     const typed = afterComma
@@ -770,7 +855,11 @@ function yamlStructureCompletions(
 
   // Mob Exclude: body keys (inline or list)
   const excludeMatch = /^\s+Exclude:\s*([A-Za-z0-9_]*)$/.exec(before)
-  if (excludeMatch && fileCategory === 'mobs' && yamlCtx.lineIndent === 2) {
+  if (
+    excludeMatch &&
+    (fileCategory === 'mobs' || fileCategory === 'other' || fileCategory === undefined) &&
+    (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 0)
+  ) {
     const typed = excludeMatch[1] ?? ''
     const opts: Completion[] = MOB_BODY_DEFS.filter((d) => d.key !== 'Template' && d.key !== 'Exclude')
       .map((d) => ({
@@ -782,7 +871,7 @@ function yamlStructureCompletions(
   }
 
   const excludeListMatch = /^\s+-\s+([A-Za-z0-9_]*)$/.exec(before)
-  if (excludeListMatch && yamlCtx.parentKey === 'Exclude' && fileCategory === 'mobs') {
+  if (excludeListMatch && yamlCtx.parentKey === 'Exclude') {
     const typed = excludeListMatch[1] ?? ''
     const opts: Completion[] = MOB_BODY_DEFS.filter((d) => d.key !== 'Template' && d.key !== 'Exclude')
       .map((d) => ({
@@ -996,7 +1085,7 @@ export function mythicCompletion(
     }
 
     // Mob Type: (mob files only)
-    if (prefs.packIds && (fileCategory === 'mobs' || fileCategory === undefined)) {
+    if (prefs.packIds && (fileCategory === 'mobs' || fileCategory === 'other' || fileCategory === undefined)) {
       const typeKeyMatch = /^\s*Type:\s+([A-Za-z0-9_]*)$/.exec(before)
       if (typeKeyMatch) {
         const typed = typeKeyMatch[1] ?? ''
@@ -1008,7 +1097,12 @@ export function mythicCompletion(
     const yamlCtx = detectYamlEditContext(context.state.doc, line.number, fileCategory)
 
     // Skill line mechanics under a Skills: list (any file except mob metaskill lists)
-    if (prefs.mechanics && isSkillsListParent(yamlCtx.parentKey) && fileCategory !== 'mobs') {
+    if (
+      prefs.mechanics &&
+      isSkillsListParent(yamlCtx.parentKey) &&
+      fileCategory === 'skills' &&
+      !isMobStructureListParent(yamlCtx.parentKey)
+    ) {
       const skillLineMatch = /^\s+-\s+([A-Za-z]*)$/.exec(before)
       if (skillLineMatch) {
         const typed = skillLineMatch[1] ?? ''
@@ -1031,7 +1125,11 @@ export function mythicCompletion(
     } else if (prefs.mechanics) {
       // Fallback: skill lines without a detected Skills: parent (flat skill files)
       const skillLineMatch = /^\s+-\s+([A-Za-z]*)$/.exec(before)
-      if (skillLineMatch && fileCategory !== 'mobs') {
+      if (
+        skillLineMatch &&
+        fileCategory !== 'mobs' &&
+        !isMobStructureListParent(yamlCtx.parentKey)
+      ) {
         const typed = skillLineMatch[1] ?? ''
         const opts = [
           ...completions.mechanics,

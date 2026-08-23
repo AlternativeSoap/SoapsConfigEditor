@@ -1511,7 +1511,7 @@ function App() {
             onClose={() => setSettingsOpen(false)}
             acPrefs={acPrefs}
             onAcPrefsChange={updateAcPrefs}
-            showAcSettings={isMythicMobs}
+            showAcSettings={isMythicMobs || isMMOCore}
             mythicAddons={isMythicMobs ? mythicAddons : undefined}
             onMythicAddonsChange={isMythicMobs ? updateMythicAddons : undefined}
             savePrefs={savePrefs}
@@ -1849,8 +1849,8 @@ function App() {
               }
             }}
             placeholder="Select a file from the list."
-            packIndex={isMythicMobs ? packIndex : undefined}
-            acPrefs={isMythicMobs ? acPrefs : undefined}
+            packIndex={isMythicMobs || isMMOCore ? packIndex : undefined}
+            acPrefs={isMythicMobs || isMMOCore ? acPrefs : undefined}
             fileCategory={
               isMythicMobs || isMMOCore || isSoapsQuest ? activeFile?.category : undefined
             }

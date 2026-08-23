@@ -18,6 +18,7 @@ function completeAt(
   col?: number,
   fileCategory: Parameters<typeof mythicCompletion>[5] = 'mobs',
   crucible = false,
+  explicit = true,
 ) {
   const state = EditorState.create({ doc: yaml })
   const line = state.doc.line(lineNumber)
@@ -32,7 +33,7 @@ function completeAt(
     resolveMythicCatalogs(crucible),
     crucible,
   )
-  const ctx = new CompletionContext(state, pos, true)
+  const ctx = new CompletionContext(state, pos, explicit)
   return source(ctx)
 }
 
@@ -87,7 +88,7 @@ describe('yamlEditContext for mob Options and AI', () => {
 })
 
 describe('mob body-key apply snippets', () => {
-  it('inserts Skills: [] when completing Skil on a mob line', () => {
+  it('inserts Skills dash list when completing Skil on a mob line', () => {
     const result = completeAt(
       `Skeletal:
   Type: ZOMBIE
@@ -95,7 +96,7 @@ describe('mob body-key apply snippets', () => {
 `,
       3,
     )
-    expect(applyForLabel(result, 'Skills')).toBe('Skills: []')
+    expect(applyForLabel(result, 'Skills')).toBe('Skills:\n  - ')
   })
 
   it('inserts scalar keys with colon and space', () => {
@@ -112,15 +113,16 @@ describe('mob body-key apply snippets', () => {
     const result = completeAt(
       `Skeletal:
   Type: ZOMBIE
-  Skills: []
+  Skills:
+  - MetaSkill
   Dro
 `,
-      4,
+      5,
     )
     const labels = result?.options.map((o) => o.label) ?? []
     expect(labels).not.toContain('Skills')
     expect(labels).toContain('Drops')
-    expect(applyForLabel(result, 'Drops')).toBe('Drops: []')
+    expect(applyForLabel(result, 'Drops')).toBe('Drops:\n  - ')
   })
 })
 
@@ -335,6 +337,41 @@ describe('mob DamageModifiers autocomplete', () => {
     expect(applyForLabel(result, 'FIRE')).toBe('FIRE 1')
   })
 
+  it('suggests damage types while typing without explicit trigger', () => {
+    const yaml = `internalname:
+  Display: "test"
+  Health: 10
+  Damage: 20
+  Skills: []
+  DamageModifiers:
+    - FIRE 1
+    - PO`
+    const result = completeAt(yaml, 8, undefined, 'mobs', false, false)
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('POISON')
+  })
+
+  it('suggests damage types when list items share indent with DamageModifiers', () => {
+    const yaml = `MY_NEW_MOB:
+  Type: ZOMBIE
+  DamageModifiers:
+  - FIRE 1
+  - poison 1
+  - void`
+    const result = completeAt(yaml, 6, undefined, 'mobs', false, false)
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('VOID')
+  })
+
+  it('suggests damage types when file category is other but parent is DamageModifiers', () => {
+    const yaml = `internalname:
+  DamageModifiers:
+    - PO`
+    const result = completeAt(yaml, 3, undefined, 'other', false, false)
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('POISON')
+  })
+
   it('suggests BossBar keys under BossBar block', () => {
     const result = completeAt(
       `Skeletal:
@@ -357,6 +394,62 @@ describe('mob DamageModifiers autocomplete', () => {
       4,
     )
     expect(applyForLabel(result, 'ImmunityTable')).toBe('ImmunityTable: true')
+  })
+
+  it('suggests BossBar keys when children share indent with BossBar', () => {
+    const yaml = `Skeletal:
+  Type: ZOMBIE
+  BossBar:
+  Enabled: true
+  Color: R`
+    const result = completeAt(yaml, 5, undefined, 'mobs', false, false)
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('RED')
+  })
+
+  it('suggests Options keys when children share indent with Options', () => {
+    const yaml = `Skeletal:
+  Type: ZOMBIE
+  Options:
+  MovementSpeed: 0.3
+  AlwaysShow`
+    const result = completeAt(yaml, 5, undefined, 'mobs', false, false)
+    expect(applyForLabel(result, 'AlwaysShowName')).toBe('AlwaysShowName: false')
+  })
+
+  it('suggests AI goals when list shares indent with AIGoalSelectors', () => {
+    const yaml = `Skeletal:
+  Type: ZOMBIE
+  AIGoalSelectors:
+  - clear
+  - melee`
+    const result = completeAt(yaml, 5, undefined, 'other', false, false)
+    expect(applyForLabel(result, 'meleeattack')).toBe('meleeattack{speed=1}')
+  })
+
+  it('suggests body keys when typing a new field below a list section', () => {
+    const yaml = `AshWisp:
+  Type: PHANTOM
+  Display: '&7Ash Wisp'
+  Health: 40
+  Damage: 2
+  Options:
+    MovementSpeed: 0.35
+    Silent: true
+    PreventOtherDrops: true
+  AIGoalSelectors:
+  - clear
+  - randomstroll
+  - float
+  AITargetSelectors:
+  - clear
+  - players
+  DamageMod
+  Skills:
+  - skill{s=AshWisp_Flicker} @self ~onTimer:80`
+    const result = completeAt(yaml, 17, undefined, 'mobs', false, false)
+    expect(applyForLabel(result, 'DamageModifiers')).toBe('DamageModifiers:\n  - FIRE 1')
+    expect(detectYamlEditContext(doc(yaml), 17, 'mobs').parentKey).toBeNull()
   })
 })
 
@@ -531,5 +624,155 @@ describe('nested blocks beyond mobs', () => {
       true,
     )
     expect(applyForLabel(result, 'Type')).toBe('Type: ')
+  })
+})
+
+describe('autocomplete audit hardenings', () => {
+  it('scopes sibling body-key dedup to the current mob entity', () => {
+    const result = completeAt(
+      `MobA:
+  Type: ZOMBIE
+  Health: 100
+MobB:
+  Type: SKELETON
+  Hea
+`,
+      6,
+    )
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('Health')
+  })
+
+  it('suggests top-level mob body keys when category is other', () => {
+    const result = completeAt(
+      `CustomBoss:
+  Typ
+`,
+      2,
+      undefined,
+      'other',
+    )
+    expect(applyForLabel(result, 'Type')).toBe('Type: ')
+  })
+
+  it('does not steal resource bar keys with class skill-binding handler', () => {
+    const result = completeAt(
+      `display:
+  name: Warrior
+resource:
+    health:
+        typ
+`,
+      5,
+      undefined,
+      'classes',
+    )
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('type')
+    expect(labels).not.toContain('level')
+    expect(labels).not.toContain('max-level')
+  })
+
+  it('suggests attribute value keys under attributes, not skill bindings', () => {
+    const result = completeAt(
+      `attributes:
+    MAX_HEALTH:
+        bas
+`,
+      3,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(result, 'base')).toBe('base: ')
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).not.toContain('level')
+  })
+
+  it('suggests skill binding keys under skills only', () => {
+    const result = completeAt(
+      `skills:
+    STORM_BOLT:
+        lev
+`,
+      3,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(result, 'level')).toBe('level: ')
+  })
+
+  it('suggests resource value keys at indent 12', () => {
+    const base = completeAt(
+      `resource:
+    health:
+        type: LINEAR
+        value:
+            bas
+`,
+      5,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(base, 'base')).toBe('base: ')
+    const per = completeAt(
+      `resource:
+    health:
+        type: LINEAR
+        value:
+            per
+`,
+      5,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(per, 'per-level')).toBe('per-level: ')
+  })
+
+  it('suggests root mana display keys at indent 4', () => {
+    const result = completeAt(
+      `mana:
+    cha
+`,
+      2,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(result, 'char')).toBe('char: ')
+  })
+
+  it('suggests resource.mana bar keys under resource', () => {
+    const typeResult = completeAt(
+      `resource:
+    mana:
+        typ
+`,
+      3,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(typeResult, 'type')).toBe('type: ')
+    const off = completeAt(
+      `resource:
+    mana:
+        off
+`,
+      3,
+      undefined,
+      'classes',
+    )
+    expect(applyForLabel(off, 'off-combat')).toBe('off-combat: true')
+  })
+
+  it('applies quest objectives as a list starter', () => {
+    const result = completeAt(
+      `quests:
+  my_quest:
+    obj
+`,
+      3,
+      undefined,
+      'quests',
+    )
+    expect(applyForLabel(result, 'objectives')).toBe('objectives:\n    - type: ')
   })
 })

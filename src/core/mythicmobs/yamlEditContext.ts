@@ -82,22 +82,136 @@ export function isConditionsListParent(parentKey: YamlListParent | null): boolea
   return parentKey === 'Conditions'
 }
 
-/** Walk upward to find the YAML list/block key containing the current line. */
-export function detectYamlEditContext(doc: Text, lineNumber: number, fileCategory?: MythicCategory): YamlEditContext {
-  const lineIndent = leadingIndent(doc.line(lineNumber).text)
-  let parentKey: YamlListParent = null
+/** Mob YAML list blocks that are not skill mechanics lines. */
+export function isMobStructureListParent(parentKey: YamlListParent | null): boolean {
+  return (
+    parentKey === 'DamageModifiers' ||
+    parentKey === 'KillMessages' ||
+    parentKey === 'AIGoalSelectors' ||
+    parentKey === 'AITargetSelectors' ||
+    parentKey === 'Drops' ||
+    parentKey === 'Exclude'
+  )
+}
+
+/** Sections whose content is `- entry` lines at the same indent as the header. */
+const LIST_DASH_PARENTS = new Set<YamlListParent>([
+  'Skills',
+  'Conditions',
+  'Drops',
+  'AIGoalSelectors',
+  'AITargetSelectors',
+  'Exclude',
+  'DamageModifiers',
+  'KillMessages',
+  'Description',
+  'BaseStats',
+  'StatModifiers',
+  'SpellUnlocks',
+])
+
+function isListDashSectionKey(key: string): boolean {
+  const normalized = normalizeYamlParentKey(key)
+  return normalized !== null && LIST_DASH_PARENTS.has(normalized)
+}
+
+function nearestSameIndentAbove(
+  doc: { line: (n: number) => { text: string } },
+  lineNumber: number,
+  lineIndent: number,
+): { kind: 'list' | 'map-child' | 'section-header'; key?: string } | null {
+  for (let i = lineNumber - 1; i >= 1; i--) {
+    const text = doc.line(i).text
+    const ind = leadingIndent(text)
+    if (ind < lineIndent) break
+    if (ind > lineIndent) continue
+    if (!text.trim() || text.trim().startsWith('#')) continue
+    if (/^\s*-\s+/.test(text)) return { kind: 'list' }
+    const bare = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(text)
+    if (bare?.[1]) return { kind: 'section-header', key: bare[1] }
+    if (/^\s*[A-Za-z][A-Za-z0-9_-]*:\s+\S/.test(text)) return { kind: 'map-child' }
+    return null
+  }
+  return null
+}
+
+/**
+ * Nearest YAML block key for the current line.
+ * Mythic often uses same-indent children (`DamageModifiers:` / `BossBar:` /
+ * `Options:` then `  - entry` or `  Enabled: true` as siblings). Prefer the
+ * nearest same-indent bare `Key:` section header, then a less-indent ancestor.
+ */
+export function findYamlBlockParentKey(
+  doc: { line: (n: number) => { text: string } },
+  lineNumber: number,
+  lineIndent: number,
+): string | null {
+  const currentLine = doc.line(lineNumber).text
+  const onListLine = /^\s*-\s+/.test(currentLine)
+  const typingPartialKey =
+    /^\s+[A-Za-z][A-Za-z0-9_-]*$/.test(currentLine) && !currentLine.includes(':')
+
+  // Typing a new key without `:` — decide from the nearest same-indent line above.
+  if (!onListLine && typingPartialKey) {
+    const nearest = nearestSameIndentAbove(doc, lineNumber, lineIndent)
+    if (nearest?.kind === 'list') {
+      // e.g. DamageMod after AITargetSelectors list, before Skills:
+    } else if (
+      nearest?.kind === 'map-child' ||
+      (nearest?.kind === 'section-header' && nearest.key && !isListDashSectionKey(nearest.key))
+    ) {
+      for (let i = lineNumber - 1; i >= 1; i--) {
+        const text = doc.line(i).text
+        const ind = leadingIndent(text)
+        if (ind < lineIndent) break
+        if (ind > lineIndent) continue
+        if (/^\s*-\s+/.test(text)) continue
+        const bareSection = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(text)
+        if (bareSection?.[1] && !isListDashSectionKey(bareSection[1])) return bareSection[1]
+      }
+    } else {
+      // Fall through to less-indent scan.
+    }
+    for (let i = lineNumber - 1; i >= 1; i--) {
+      const text = doc.line(i).text
+      const ind = leadingIndent(text)
+      if (ind >= lineIndent) continue
+      const keyMatch = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*(.*)?$/.exec(text)
+      if (keyMatch?.[1]) return keyMatch[1]
+    }
+    return null
+  }
+
+  for (let i = lineNumber - 1; i >= 1; i--) {
+    const text = doc.line(i).text
+    const ind = leadingIndent(text)
+    if (ind < lineIndent) break
+    if (ind > lineIndent) continue
+    if (/^\s*-\s+/.test(text)) continue
+    const bareSection = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*$/.exec(text)
+    if (bareSection?.[1]) {
+      if (!onListLine && isListDashSectionKey(bareSection[1])) continue
+      return bareSection[1]
+    }
+    if (/^\s*[A-Za-z][A-Za-z0-9_-]*:\s+\S/.test(text)) continue
+    break
+  }
 
   for (let i = lineNumber - 1; i >= 1; i--) {
     const text = doc.line(i).text
     const ind = leadingIndent(text)
     if (ind >= lineIndent) continue
-    const keyMatch = /^\s*([A-Za-z][A-Za-z0-9_]*):\s*(.*)?$/.exec(text)
-    if (keyMatch?.[1]) {
-      parentKey = normalizeYamlParentKey(keyMatch[1]) ?? null
-      if (parentKey) break
-    }
+    const keyMatch = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*(.*)?$/.exec(text)
+    if (keyMatch?.[1]) return keyMatch[1]
   }
+  return null
+}
 
+/** Walk upward to find the YAML list/block key containing the current line. */
+export function detectYamlEditContext(doc: Text, lineNumber: number, fileCategory?: MythicCategory): YamlEditContext {
+  const lineIndent = leadingIndent(doc.line(lineNumber).text)
+  const raw = findYamlBlockParentKey(doc, lineNumber, lineIndent)
+  const parentKey = raw ? normalizeYamlParentKey(raw) : null
   return { parentKey, lineIndent, fileCategory }
 }
 
@@ -132,17 +246,50 @@ export function bodyKeysForCategory(category?: MythicCategory): string[] {
   return defsToKeys(bodyKeyDefsForCategory(category))
 }
 
-/** Collect sibling body keys at a given indent under the same entity block. */
+/**
+ * Collect sibling body keys at a given indent under the same entity/parent block.
+ * Scoped between the enclosing parent (indent &lt; target) and the next peer of that parent,
+ * so multi-mob / multi-entity files do not hide keys across entities.
+ */
 export function collectSiblingBodyKeys(
   doc: { line: (n: number) => { text: string }; lines: number },
   lineNumber: number,
   indent: number,
 ): Set<string> {
   const present = new Set<string>()
-  for (let i = 1; i <= doc.lines; i++) {
-    if (i === lineNumber) continue
+
+  // Indent 0: typical one-class-per-file layout; scan the whole document.
+  if (indent === 0) {
+    for (let i = 1; i <= doc.lines; i++) {
+      if (i === lineNumber) continue
+      const text = doc.line(i).text
+      if (leadingIndent(text) !== 0) continue
+      const m = /^([A-Za-z][A-Za-z0-9_-]*):/.exec(text)
+      if (m?.[1]) present.add(m[1])
+    }
+    return present
+  }
+
+  let parentLine = 0
+  for (let i = lineNumber - 1; i >= 1; i--) {
     const text = doc.line(i).text
+    if (!text.trim() || text.trim().startsWith('#')) continue
     const ind = leadingIndent(text)
+    if (ind < indent) {
+      parentLine = i
+      break
+    }
+  }
+
+  const parentIndent = parentLine > 0 ? leadingIndent(doc.line(parentLine).text) : -1
+  const start = parentLine > 0 ? parentLine + 1 : 1
+
+  for (let i = start; i <= doc.lines; i++) {
+    const text = doc.line(i).text
+    if (!text.trim() || text.trim().startsWith('#')) continue
+    const ind = leadingIndent(text)
+    if (ind <= parentIndent) break
+    if (i === lineNumber) continue
     if (ind !== indent) continue
     const m = /^\s*([A-Za-z][A-Za-z0-9_-]*):/.exec(text)
     if (m?.[1]) present.add(m[1])
@@ -150,18 +297,30 @@ export function collectSiblingBodyKeys(
   return present
 }
 
-/** Nearest YAML key ancestor with less indent than the current line. */
+/** True when an ancestor key with indent &lt; lineIndent matches `name` (case-insensitive). */
+export function hasYamlAncestorKey(
+  doc: { line: (n: number) => { text: string } },
+  lineNumber: number,
+  lineIndent: number,
+  name: string,
+): boolean {
+  const want = name.toLowerCase()
+  for (let i = lineNumber - 1; i >= 1; i--) {
+    const text = doc.line(i).text
+    if (!text.trim() || text.trim().startsWith('#')) continue
+    const ind = leadingIndent(text)
+    if (ind >= lineIndent) continue
+    const m = /^\s*([A-Za-z][A-Za-z0-9_-]*):/.exec(text)
+    if (m?.[1]?.toLowerCase() === want) return true
+  }
+  return false
+}
+
+/** Nearest YAML key ancestor for nested completions (includes same-indent list owners). */
 export function findNearestYamlParentKey(
   doc: { line: (n: number) => { text: string } },
   lineNumber: number,
   lineIndent: number,
 ): string | null {
-  for (let i = lineNumber - 1; i >= 1; i--) {
-    const text = doc.line(i).text
-    const ind = leadingIndent(text)
-    if (ind >= lineIndent) continue
-    const keyMatch = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*(.*)?$/.exec(text)
-    if (keyMatch?.[1]) return keyMatch[1]
-  }
-  return null
+  return findYamlBlockParentKey(doc, lineNumber, lineIndent)
 }
