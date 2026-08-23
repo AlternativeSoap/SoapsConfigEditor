@@ -37,6 +37,8 @@ export type MythicCategory =
   | 'archetypes'
   | 'reagents'
   | 'quests'
+  | 'equipment-sets'
+  | 'augments'
   | 'other'
 
 export type SessionMode = 'opened' | 'new-pack'
@@ -70,13 +72,15 @@ export type ValidationIssueType =
   | 'missing_skill_reference'
   | 'missing_droptable_reference'
   | 'missing_spawn_mob_reference'
+  | 'missing_equipment_set_reference'
+  | 'missing_augment_type_reference'
 
 export interface ValidationIssue {
   type: ValidationIssueType
   filePath: string
   /** Mob / spawn / entity that holds the bad reference */
   entityId: string
-  /** Missing skill, droptable, or mob ID */
+  /** Missing skill, droptable, mob, set, or augment ID */
   missingId: string
 }
 
@@ -85,6 +89,10 @@ export interface PackIndex {
   itemIds: string[]
   skillIds: string[]
   droptableIds: string[]
+  reagentIds: string[]
+  archetypeIds: string[]
+  equipmentSetIds: string[]
+  augmentTypeIds: string[]
 }
 
 export type CreateKind =
@@ -101,6 +109,10 @@ export type CreateKind =
   | 'archetype'
   | 'reagent'
   | 'quest'
+  | 'equipment-set'
+  | 'augment-type'
+  | 'crucible-item'
+  | 'bag'
 
 /** Shared skill modifier used by MMOCore class skills + MythicLib parameters. */
 export interface SkillModifierValues {
@@ -263,6 +275,14 @@ export interface MobGeneratorInput {
   skills: string
   drops: string
   equipment: Record<string, string>
+  /** Options keys the user added; only these are written to YAML. */
+  options: Record<string, string | number | boolean>
+  faction: string
+  armor: number | ''
+  /** Multiline AIGoalSelectors (one per line). */
+  aiGoalSelectors: string
+  /** Multiline AITargetSelectors (one per line). */
+  aiTargetSelectors: string
 }
 
 export interface ItemGeneratorInput {
@@ -361,4 +381,80 @@ export interface ReagentGeneratorInput {
   writeMaxManaStat: boolean
   maxManaBase: number
 }
+
+/** Crucible equipment set bonus threshold. */
+export interface EquipmentSetBonusInput {
+  pieces: number
+  stats: string
+  skills: string
+}
+
+export interface EquipmentSetGeneratorInput {
+  id: string
+  display: string
+  enabled: boolean
+  lore: string
+  bonuses: EquipmentSetBonusInput[]
+}
+
+export interface AugmentTypeGeneratorInput {
+  id: string
+  display: string
+  enabled: boolean
+  emptyFormat: string
+  filledFormat: string
+  showEmptySlot: boolean
+  iconEmpty: string
+  iconFilled: string
+  iconInvalid: string
+}
+
+export type CrucibleItemKind = 'ITEM' | 'BAG' | 'HAT'
+export type CrucibleItemRole = 'standard' | 'gem' | 'socket' | 'remover'
+
+export interface CrucibleItemGeneratorInput {
+  id: string
+  material: string
+  display: string
+  group: string
+  itemKind: CrucibleItemKind
+  role: CrucibleItemRole
+  lore: string
+  loreTemplate: string
+  /** Newline-separated STAT value MODIFIER lines */
+  stats: string
+  equipmentSet: string
+  skills: string
+  optionsCancelDamage: boolean
+  optionsKeepOnDeath: boolean
+  optionsPreventDropping: boolean
+  optionsPlaceable: boolean
+  optionsPreventEnchanting: boolean
+  optionsPreventStacking: boolean
+  optionsRepairable: boolean
+  itemUpdaterVersion: number
+  maxDurability: string
+  durability: string
+  defaultLevel: string
+  maxLevel: string
+  /** Single slot type, or empty */
+  augmentSlotType: string
+  augmentSlotAmount: string
+  augmentSlotChance: string
+  augmentSlotMaxAmount: string
+  /** Gem / socket / remover type id */
+  augmentType: string
+  augmentTooltip: string
+  augmentRemoverDestroySocket: boolean
+  augmentRemoverReturnAugment: boolean
+  augmentSocketMaxSockets: number
+  bagSize: number
+  bagTitle: string
+  bagPreventNesting: boolean
+  bagSaveOnUpdate: boolean
+  bagAutoPickup: boolean
+  recipeType: '' | 'SHAPED' | 'SHAPELESS'
+  recipeIngredients: string
+}
+
 

@@ -82,11 +82,20 @@ export function upsertElementRow(
   return generateElementsYaml(rows)
 }
 
-export function generateAttackSkillRegistrations(prefix: string, category: string): string {
+/** Emit only attack skill ids that are not already registered. */
+export function generateAttackSkillRegistrations(
+  prefix: string,
+  category: string,
+  existingIds?: Set<string>,
+): string {
   const regular = `${prefix}_regular_attack`
   const crit = `${prefix}_critical_strike`
   const cat = category.toUpperCase()
-  return `${regular}:
+  const known = existingIds ?? new Set<string>()
+  const chunks: string[] = []
+
+  if (!known.has(regular)) {
+    chunks.push(`${regular}:
   source: mythiclib:${regular}
   name: ${cat.charAt(0) + cat.slice(1).toLowerCase()} Regular Attack
   icon: BOOK
@@ -97,8 +106,11 @@ export function generateAttackSkillRegistrations(prefix: string, category: strin
     - ''
     - '&cCooldown&7: &f{cooldown}s'
     - '&9Cost&7: &f{mana} {mana_name}'
+`)
+  }
 
-${crit}:
+  if (!known.has(crit)) {
+    chunks.push(`${crit}:
   source: mythiclib:${crit}
   name: ${cat.charAt(0) + cat.slice(1).toLowerCase()} Critical Strike
   icon: BOOK
@@ -109,5 +121,22 @@ ${crit}:
     - ''
     - '&cCooldown&7: &f{cooldown}s'
     - '&9Cost&7: &f{mana} {mana_name}'
-`
+`)
+  }
+
+  return chunks.join('\n').trimEnd() + (chunks.length ? '\n' : '')
+}
+
+/** Prefer skill category / damage element over class id for elements.yml keys. */
+export function resolvePrimaryElementId(input: {
+  id: string
+  skills: { categories?: string[]; damageElement?: string }[]
+}): string {
+  for (const s of input.skills) {
+    const fromEl = s.damageElement?.trim()
+    if (fromEl) return fromEl.toUpperCase()
+    const fromCat = s.categories?.find((c) => c.trim())
+    if (fromCat) return fromCat.trim().toUpperCase()
+  }
+  return input.id.trim().toUpperCase() || 'CUSTOM'
 }

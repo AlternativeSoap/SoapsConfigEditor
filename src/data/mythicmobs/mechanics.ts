@@ -8,6 +8,8 @@ export type MechanicCategory =
   | 'projectile'
   | 'meta'
   | 'variables'
+  | 'items'
+  | 'furniture'
 
 export interface MechanicAttr {
   name: string
@@ -36,6 +38,8 @@ export const MECHANIC_CATEGORY_LABELS: Record<MechanicCategory, string> = {
   projectile: 'Projectiles',
   meta: 'Meta',
   variables: 'Variables',
+  items: 'Items',
+  furniture: 'Furniture',
 }
 
 export const MECHANICS: MechanicEntry[] = [

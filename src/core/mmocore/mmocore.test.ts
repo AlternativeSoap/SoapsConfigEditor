@@ -17,6 +17,8 @@ import {
   generateElementsYaml,
   parseElementsYaml,
   upsertElementRow,
+  generateAttackSkillRegistrations,
+  resolvePrimaryElementId,
 } from './elements'
 import { indexMMOCorePack } from './indexPack'
 import { parseClassYaml } from './parseClass'
@@ -213,6 +215,22 @@ describe('generators', () => {
     expect(issues.some((i) => i.message.includes('storm_regular_attack'))).toBe(false)
   })
 
+  it('preflight warns but does not error when attack skills are on and sync is off', () => {
+    const input = createDefaultClassInput({ id: 'storm' })
+    input.includeAttackSkills = true
+    input.attackSkillPrefix = 'storm'
+    input.syncElementRow = false
+    input.skills = []
+    const index = indexMMOCorePack([])
+    const issues = runClassPreflight(input, index)
+    expect(issues.some((i) => i.level === 'error' && i.message.includes('storm_regular_attack'))).toBe(
+      false,
+    )
+    expect(issues.some((i) => i.level === 'warning' && i.message.includes('Update MythicLib'))).toBe(
+      true,
+    )
+  })
+
   it('preflight flags missing mythiclib skill', () => {
     const input = createDefaultClassInput({ id: 'x' })
     input.skills = [
@@ -265,6 +283,26 @@ describe('elements', () => {
       critStrikeId: 'storm_critical_strike',
     })
     expect(next).toContain('color: "&3"')
+  })
+
+  it('appends only missing attack skill registrations', () => {
+    const onlyCritMissing = generateAttackSkillRegistrations(
+      'storm',
+      'STORM',
+      new Set(['storm_regular_attack']),
+    )
+    expect(onlyCritMissing).toContain('storm_critical_strike:')
+    expect(onlyCritMissing).not.toContain('storm_regular_attack:')
+  })
+
+  it('resolves element id from skill category before class id', () => {
+    expect(
+      resolvePrimaryElementId({
+        id: 'mage',
+        skills: [{ categories: ['STORM'], damageElement: undefined }],
+      }),
+    ).toBe('STORM')
+    expect(resolvePrimaryElementId({ id: 'mage', skills: [] })).toBe('MAGE')
   })
 })
 

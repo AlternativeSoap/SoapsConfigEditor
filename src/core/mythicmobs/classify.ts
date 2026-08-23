@@ -17,6 +17,12 @@ export function classifyMythicCategory(filePath: string): MythicCategory {
   if (baseName === 'reagents.yml' || baseName.startsWith('reagents.')) {
     return 'reagents'
   }
+  if (baseName === 'equipment-sets.yml' || baseName.startsWith('equipment-sets.')) {
+    return 'equipment-sets'
+  }
+  if (baseName === 'augments.yml' || baseName.startsWith('augments.')) {
+    return 'augments'
+  }
   if (baseName === 'stats.yml' || baseName.endsWith('.stat.yml')) {
     return 'other'
   }

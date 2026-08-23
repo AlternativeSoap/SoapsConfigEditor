@@ -3,6 +3,7 @@ import {
   generateSpellYaml,
   resolvePackRoot,
   suggestSpellPath,
+  yamlHasTopLevelKey,
 } from '../../core/mythicrpg/generators'
 import { SPELL_PRESETS } from '../../data/mythicrpg/presets'
 import type { FileRecord, SpellCastingMode, SpellGeneratorInput } from '../../types'
@@ -46,6 +47,7 @@ interface SpellWizardDialogProps {
   packName: string
   reagentIds: string[]
   existingSkillIds: string[]
+  crucibleEnabled?: boolean
   onClose: () => void
   onApply: (output: SpellWizardOutput) => void
 }
@@ -69,6 +71,7 @@ export function SpellWizardDialog({
   packName,
   reagentIds,
   existingSkillIds,
+  crucibleEnabled = false,
   onClose,
   onApply,
 }: SpellWizardDialogProps) {
@@ -150,8 +153,14 @@ export function SpellWizardDialog({
         return
       }
     }
-    const path = targetPath.trim() || suggestSpellPath(packRoot)
-    onApply({ files: [appendOrCreate(files, path.replace(/\\/g, '/'), yaml)] })
+    const path = (targetPath.trim() || suggestSpellPath(packRoot)).replace(/\\/g, '/')
+    const existing = files.find((f) => f.path.replace(/\\/g, '/') === path)
+    if (existing && yamlHasTopLevelKey(existing.content, input.id.trim())) {
+      setStep(0)
+      setError(`Spell ${input.id.trim()} already exists in ${path}. Pick another id or edit the existing entry.`)
+      return
+    }
+    onApply({ files: [appendOrCreate(files, path, yaml)] })
   }
 
   return (
@@ -166,6 +175,7 @@ export function SpellWizardDialog({
           <div>
             <h2 id="spell-wizard-title">New spell</h2>
             <p className="wz-step-hint">{STEP_HINTS[step]}</p>
+            <p className="create-section-hint">Choose a target Skills file, then save afterwards to write it.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close">
             ×
@@ -339,6 +349,11 @@ export function SpellWizardDialog({
                   />
                 </label>
               </div>
+              {reagentIds.length === 0 ? (
+                <p className="create-section-hint">
+                  No reagents in this pack yet. Use New → New reagent first if this spell should cost a resource.
+                </p>
+              ) : null}
               {input.castingMode !== 'passive' ? (
                 <div className="wz-grid-2">
                   <label className="wz-field">
@@ -411,6 +426,7 @@ export function SpellWizardDialog({
                 <SkillLineBuilder
                   value={input.skills.split('\n')[0] ?? ''}
                   hideTriggers
+                  crucibleEnabled={crucibleEnabled}
                   onConfirm={(line) => {
                     const rest = input.skills.split('\n').slice(1).join('\n')
                     patch({ skills: rest ? `${line}\n${rest}` : line })

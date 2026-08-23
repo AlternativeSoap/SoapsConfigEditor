@@ -28,9 +28,62 @@ describe('mythicmobs helpers', () => {
       skills: 'SKILL_A\nSKILL_B',
       drops: '',
       equipment: {},
+      options: {},
+      faction: '',
+      armor: '',
+      aiGoalSelectors: '',
+      aiTargetSelectors: '',
     })
     expect(yaml).toContain('TEST_MOB:')
     expect(yaml).toContain('- SKILL_A')
+  })
+
+  it('generates mob Options, Faction, Armor, and AI selectors when set', () => {
+    const yaml = generateMobYaml({
+      id: 'BOSS',
+      type: 'ZOMBIE',
+      display: 'Boss',
+      health: 100,
+      damage: 8,
+      skills: '',
+      drops: '',
+      equipment: {},
+      options: { MovementSpeed: 0.3, AlwaysShowName: true },
+      faction: 'Undead',
+      armor: 10,
+      aiGoalSelectors: 'clear\nmeleeattack',
+      aiTargetSelectors: 'clear\nplayers',
+    })
+    expect(yaml).toContain('Faction: Undead')
+    expect(yaml).toContain('Armor: 10')
+    expect(yaml).toContain('Options:')
+    expect(yaml).toContain('MovementSpeed: 0.3')
+    expect(yaml).toContain('AlwaysShowName: true')
+    expect(yaml).toContain('AIGoalSelectors:')
+    expect(yaml).toContain('- meleeattack')
+    expect(yaml).toContain('AITargetSelectors:')
+    expect(yaml).toContain('- players')
+  })
+
+  it('omits Options and AI blocks when empty', () => {
+    const yaml = generateMobYaml({
+      id: 'PLAIN',
+      type: 'PIG',
+      display: 'Pig',
+      health: 10,
+      damage: 0,
+      skills: '',
+      drops: '',
+      equipment: {},
+      options: {},
+      faction: '',
+      armor: '',
+      aiGoalSelectors: '',
+      aiTargetSelectors: '',
+    })
+    expect(yaml).not.toContain('Options:')
+    expect(yaml).not.toContain('AIGoalSelectors:')
+    expect(yaml).not.toContain('Faction:')
   })
 
   it('generates item lore from real newlines', () => {

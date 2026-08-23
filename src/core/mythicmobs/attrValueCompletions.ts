@@ -105,11 +105,6 @@ export const WEATHER_TYPES = ['CLEAR', 'RAIN', 'STORM', 'THUNDER', 'DOWNFALL']
 
 export const RANDOMSPAWN_ACTIONS = ['ADD', 'REPLACE', 'DENY']
 
-export const AI_GOALS = [
-  'clear', 'lookatplayers', 'randomstroll', 'meleeattack', 'float', 'panic', 'avoidplayers',
-  'movethroughvillage', 'opendoor', 'restrictsun', 'restrictopen', 'gotoparent', 'followparent',
-]
-
 export const PLACEHOLDERS = [
   '<caster.name>', '<caster.uuid>', '<caster.hp>', '<caster.mhp>', '<caster.level>',
   '<target.name>', '<target.uuid>', '<target.hp>', '<target.mhp>',

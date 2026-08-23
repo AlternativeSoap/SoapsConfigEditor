@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AcPrefs, SavePrefs, ThemeMode } from '../types'
+import type { MythicAddons } from '../core/workspaces/mythicAddons'
 import { Switch } from './Switch'
 
 interface SettingsMenuProps {
@@ -12,6 +13,9 @@ interface SettingsMenuProps {
   onAcPrefsChange: (patch: Partial<AcPrefs>) => void
   /** Show the Autocomplete section (only for MythicMobs workspace) */
   showAcSettings: boolean
+  /** MythicMobs add-on toggles (omit when not MythicMobs) */
+  mythicAddons?: MythicAddons
+  onMythicAddonsChange?: (patch: Partial<MythicAddons>) => void
   savePrefs: SavePrefs
   onSavePrefsChange: (patch: Partial<SavePrefs>) => void
   onBackupNow: () => Promise<void>
@@ -68,6 +72,8 @@ export function SettingsMenu({
   acPrefs,
   onAcPrefsChange,
   showAcSettings,
+  mythicAddons,
+  onMythicAddonsChange,
   savePrefs,
   onSavePrefsChange,
   onBackupNow,
@@ -129,6 +135,36 @@ export function SettingsMenu({
                 </div>
               </div>
             </div>
+
+            {mythicAddons && onMythicAddonsChange ? (
+              <div className="settings-section">
+                <div className="setting-row">
+                  <span className="settings-section-title">Mythic add-ons</span>
+                </div>
+                <div className="setting-row">
+                  <div className="ac-toggle-text">
+                    <span className="setting-label">MythicRPG</span>
+                    <span className="ac-toggle-hint">Show spell, archetype, and reagent tools</span>
+                  </div>
+                  <Switch
+                    checked={mythicAddons.mythicrpg}
+                    onChange={(v) => onMythicAddonsChange({ mythicrpg: v })}
+                    aria-label="Enable MythicRPG tools"
+                  />
+                </div>
+                <div className="setting-row">
+                  <div className="ac-toggle-text">
+                    <span className="setting-label">Crucible</span>
+                    <span className="ac-toggle-hint">Show Crucible item, set, and augment tools</span>
+                  </div>
+                  <Switch
+                    checked={mythicAddons.crucible}
+                    onChange={(v) => onMythicAddonsChange({ crucible: v })}
+                    aria-label="Enable Crucible tools"
+                  />
+                </div>
+              </div>
+            ) : null}
 
             {/* ── Autocomplete ── only in MythicMobs workspace ── */}
             {showAcSettings && (

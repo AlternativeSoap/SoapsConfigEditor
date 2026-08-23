@@ -29,7 +29,7 @@ const AUTOSAVE_INTERVALS: { value: number; label: string }[] = [
 
 function leadCopy(workspaceId: WorkspaceKind): string {
   if (workspaceId === 'mythicmobs') {
-    return 'Creates MythicMobs/Packs/{name}/ with starter Mobs, Items, Skills, and related files. Save into your plugins folder so paths match the server. If MythicRPG is enabled, archetype and reagent starters are included.'
+    return 'Creates MythicMobs/Packs/{name}/ with starter Mobs, Items, Skills, and related files. Save into your plugins folder so paths match the server. If MythicRPG is enabled, archetype and reagent starters are included. If Crucible is enabled, equipment set and augment starters are included.'
   }
   if (workspaceId === 'mmocore') {
     return 'Creates MMOCore/, MythicLib/, and MythicMobs/Packs/ starters as sibling folders. Save into your plugins folder so each tree lands in the matching plugin directory.'

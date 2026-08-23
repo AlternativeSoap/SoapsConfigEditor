@@ -93,6 +93,9 @@ import { TopbarFileMenu } from './ui/TopbarFileMenu'
 import { WorkspaceTiles } from './ui/WorkspaceTiles'
 import { YamlEditor, type YamlEditorHandle } from './ui/YamlEditor'
 import { EMPTY_CONTEXT, type SkillLineContext } from './core/mythicmobs/skillLineAttrs'
+import { EquipmentSetWizardDialog } from './ui/mythiccrucible/EquipmentSetWizardDialog'
+import { AugmentTypeWizardDialog } from './ui/mythiccrucible/AugmentTypeWizardDialog'
+import { CrucibleItemWizardDialog } from './ui/mythiccrucible/CrucibleItemWizardDialog'
 
 function fileIdsForCategory(category: MythicCategory, content: string): string[] {
   if (category === 'exp-curves') return []
@@ -209,6 +212,7 @@ function App() {
   const isMMOCore = workspaceId === 'mmocore'
   const isSoapsQuest = workspaceId === 'soapsquest'
   const mythicRpgEnabled = isMythicMobs && mythicAddons.mythicrpg
+  const crucibleEnabled = isMythicMobs && mythicAddons.crucible
   const hasFolder = files.length > 0 || rootLabel.length > 0
   const activeFile = files.find((file) => file.path === activePath) ?? null
   const isDirty = activePath ? dirtyMap.has(activePath) : false
@@ -387,6 +391,10 @@ function App() {
     itemIds: effectiveFiles.filter((f) => f.category === 'items').flatMap((f) => f.ids),
     skillIds: effectiveFiles.filter((f) => f.category === 'skills').flatMap((f) => f.ids),
     droptableIds: effectiveFiles.filter((f) => f.category === 'droptables').flatMap((f) => f.ids),
+    reagentIds: effectiveFiles.filter((f) => f.category === 'reagents').flatMap((f) => f.ids),
+    archetypeIds: effectiveFiles.filter((f) => f.category === 'archetypes').flatMap((f) => f.ids),
+    equipmentSetIds: effectiveFiles.filter((f) => f.category === 'equipment-sets').flatMap((f) => f.ids),
+    augmentTypeIds: effectiveFiles.filter((f) => f.category === 'augments').flatMap((f) => f.ids),
   }), [effectiveFiles])
 
   const mmocoreIndex = useMemo(() => indexMMOCorePack(effectiveFiles), [effectiveFiles])
@@ -563,10 +571,37 @@ function App() {
       setFolderWriteBlocked(false)
       await saveRootHandle(getActiveRootHandle())
       flushSessionToBrowser()
+
+      const hasRpgContent = mapped.some(
+        (f) => f.category === 'reagents' || f.category === 'archetypes',
+      )
+      const hasCrucibleContent = mapped.some(
+        (f) => f.category === 'equipment-sets' || f.category === 'augments',
+      )
+      const addonPatch: Partial<MythicAddons> = {}
+      if (workspaceId === 'mythicmobs' && hasRpgContent && !mythicAddons.mythicrpg) {
+        addonPatch.mythicrpg = true
+      }
+      if (workspaceId === 'mythicmobs' && hasCrucibleContent && !mythicAddons.crucible) {
+        addonPatch.crucible = true
+      }
+      if (Object.keys(addonPatch).length > 0) {
+        updateMythicAddons(addonPatch)
+      }
+
+      const addonNote =
+        addonPatch.mythicrpg && addonPatch.crucible
+          ? ' MythicRPG and Crucible tools were enabled because this folder includes those files.'
+          : addonPatch.mythicrpg
+            ? ' MythicRPG tools were enabled because this folder includes archetype or reagent files.'
+            : addonPatch.crucible
+              ? ' Crucible tools were enabled because this folder includes equipment set or augment files.'
+              : ''
+
       setStatusMessage(
         mapped.length === 0
           ? 'No YAML files found in that folder. Choose a different folder, or start new files from the welcome screen.'
-          : `Loaded ${mapped.length} files from ${result.rootPath}.`,
+          : `Loaded ${mapped.length} files from ${result.rootPath}.${addonNote}`,
       )
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
@@ -1112,14 +1147,49 @@ function App() {
     return true
   }
 
+  function applyFilePatches(patches: Record<string, string>, summary: string): void {
+    const entries = Object.entries(patches)
+    if (entries.length === 0) return
+    setDirtyMap((prev) => {
+      const next = new Map(prev)
+      for (const [path, content] of entries) next.set(path, content)
+      return next
+    })
+    setFiles((prev) =>
+      prev.map((f) => {
+        const content = patches[f.path]
+        if (content === undefined) return f
+        return { ...f, ids: fileIdsForCategory(f.category, content) }
+      }),
+    )
+    const firstPath = entries[0]![0]
+    if (activePath && patches[activePath] !== undefined) {
+      setDraft(patches[activePath]!)
+    } else if (patches[firstPath] !== undefined) {
+      setActivePath(firstPath)
+      setDraft(patches[firstPath]!)
+    }
+    setStatusMessage(summary)
+  }
+
   function insertGenerated(targetPath: string, yaml: string): void {
-    if (dirtyMap.has(activePath) && activePath !== targetPath) {
+    const normalized = targetPath.replace(/\\/g, '/')
+    const exists = files.some((f) => f.path.replace(/\\/g, '/') === normalized)
+
+    if (dirtyMap.has(activePath) && activePath !== normalized) {
       const leave = window.confirm('You have unsaved changes. Discard them and add the new YAML?')
       if (!leave) return
     }
-    if (appendYamlToFile(targetPath, yaml)) {
+
+    if (!exists) {
+      void applyMultiFileWrite([{ path: normalized, content: yaml, mode: 'create' }])
+      setStatusMessage(`Created ${normalized}. Save to write it to disk.`)
+      return
+    }
+
+    if (appendYamlToFile(normalized, yaml)) {
       setCreateKind(null)
-      setStatusMessage(`Added to ${targetPath}. Save the file to keep it.`)
+      setStatusMessage(`Added to ${normalized}. Save the file to keep it.`)
     }
   }
 
@@ -1141,7 +1211,11 @@ function App() {
       kind === 'skill-casting' ||
       kind === 'spell' ||
       kind === 'archetype' ||
-      kind === 'reagent'
+      kind === 'reagent' ||
+      kind === 'equipment-set' ||
+      kind === 'augment-type' ||
+      kind === 'crucible-item' ||
+      kind === 'bag'
     ) {
       return activePath
     }
@@ -1151,6 +1225,8 @@ function App() {
       : kind === 'skill' ? 'skills'
       : kind === 'droptable' ? 'droptables'
       : 'randomspawns'
+    const active = files.find((f) => f.path === activePath)
+    if (active?.category === category) return activePath
     return files.find((f) => f.category === category)?.path ?? activePath
   }
 
@@ -1175,9 +1251,15 @@ function App() {
   if (!hasFolder) {
     return (
       <main className="welcome dashboard">
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
-        <h1>Soaps Config Editor</h1>
-        <p>Choose the plugin you want to edit. This tells the editor which tools to show.</p>
+        <img
+          className="welcome-brand"
+          src={`${import.meta.env.BASE_URL}favicon.svg`}
+          alt=""
+          width={56}
+          height={56}
+        />
+        <h1 className="welcome-brand">Soaps Config Editor</h1>
+        <p className="welcome-lead">Choose a plugin to continue.</p>
         <WorkspaceTiles
           selected={workspaceId}
           onSelect={selectWorkspace}
@@ -1185,8 +1267,8 @@ function App() {
           onMythicAddonsChange={updateMythicAddons}
         />
         {workspace ? (
-          <>
-            <p>{workspace.hint}</p>
+          <div className="welcome-focus" key={workspace.id}>
+            <p className="welcome-hint">{workspace.hint}</p>
             <div className="welcome-actions">
               <button
                 type="button"
@@ -1200,26 +1282,15 @@ function App() {
                 {workspace.startLabel}
               </button>
             </div>
-          </>
-        ) : (
-          <p className="welcome-note">Select a plugin above to continue.</p>
-        )}
-        <p className="welcome-note">
-          Edits save automatically in this browser. Close the tab and come back anytime, unless you clear site data
-          for this page.
-        </p>
+          </div>
+        ) : null}
         {browserKind === 'brave' && !directoryPickerSupported() ? (
           <p className="welcome-note welcome-note-brave">
-            In Brave, folder saving is off by default. Open{' '}
-            <code>brave://flags/#file-system-access-api</code>, set File System Access API to Enabled, and relaunch
-            Brave. Open folder still works read-only without that flag. Chrome and Edge can save to a folder with no
-            extra setup.
+            In Brave, set <code>brave://flags/#file-system-access-api</code> to Enabled, then relaunch, to save
+            files to a folder.
           </p>
         ) : (
-          <p className="welcome-note">
-            To write YAML files to a folder on disk, use Open folder or Choose save folder in Chrome or Edge. Brave
-            needs the File System Access API flag enabled first.
-          </p>
+          <p className="welcome-note">Chrome or Edge can save files to a folder on disk.</p>
         )}
         <SettingsMenu
           theme={theme}
@@ -1230,6 +1301,8 @@ function App() {
           acPrefs={acPrefs}
           onAcPrefsChange={updateAcPrefs}
           showAcSettings={false}
+          mythicAddons={workspaceId === 'mythicmobs' ? mythicAddons : undefined}
+          onMythicAddonsChange={workspaceId === 'mythicmobs' ? updateMythicAddons : undefined}
           savePrefs={savePrefs}
           onSavePrefsChange={updateSavePrefs}
           backupReady={backupReady}
@@ -1333,6 +1406,8 @@ function App() {
             acPrefs={acPrefs}
             onAcPrefsChange={updateAcPrefs}
             showAcSettings={isMythicMobs}
+            mythicAddons={isMythicMobs ? mythicAddons : undefined}
+            onMythicAddonsChange={isMythicMobs ? updateMythicAddons : undefined}
             savePrefs={savePrefs}
             onSavePrefsChange={updateSavePrefs}
             backupReady={backupReady}
@@ -1500,6 +1575,7 @@ function App() {
                     const f = files.find((x) => x.path === path)
                     if (f) selectFile(f)
                   }}
+                  onApplyPatches={applyFilePatches}
                 />
               )}
             </div>
@@ -1583,6 +1659,7 @@ function App() {
             packIndex={isMythicMobs ? packIndex : undefined}
             acPrefs={isMythicMobs ? acPrefs : undefined}
             fileCategory={isMythicMobs ? activeFile?.category : undefined}
+            crucibleEnabled={crucibleEnabled}
             onLineContextChange={setEditorLineContext}
           />
           {parseIssues.length > 0 ? (
@@ -1627,6 +1704,7 @@ function App() {
                   editorRef.current?.insertConditionAttr(conditionId, attr)
                 }
                 lineContext={editorLineContext}
+                crucibleEnabled={crucibleEnabled}
               />
             </aside>
           </>
@@ -1642,12 +1720,17 @@ function App() {
       createKind !== 'spell' &&
       createKind !== 'archetype' &&
       createKind !== 'reagent' &&
-      createKind !== 'quest' ? (
+      createKind !== 'quest' &&
+      createKind !== 'equipment-set' &&
+      createKind !== 'augment-type' &&
+      createKind !== 'crucible-item' &&
+      createKind !== 'bag' ? (
         <CreateDialog
           kind={createKind}
           files={files}
           packIndex={packIndex}
           suggestedPath={suggestedPathForKind(createKind)}
+          crucibleEnabled={crucibleEnabled}
           onClose={() => setCreateKind(null)}
           onInsert={insertGenerated}
         />
@@ -1656,15 +1739,12 @@ function App() {
         <SpellWizardDialog
           files={effectiveFiles}
           packName={mythicPackName}
-          reagentIds={effectiveFiles
-            .filter((f) => f.category === 'reagents')
-            .flatMap((f) => f.ids)}
+          reagentIds={packIndex.reagentIds}
           existingSkillIds={packIndex.skillIds}
+          crucibleEnabled={crucibleEnabled}
           onClose={() => setCreateKind(null)}
           onApply={(out) => {
             void applyMultiFileWrite(out.files)
-            setCreateKind(null)
-            setStatusMessage('Spell added. Save the file to keep it.')
           }}
         />
       ) : null}
@@ -1673,11 +1753,10 @@ function App() {
           files={effectiveFiles}
           packName={mythicPackName}
           skillIds={packIndex.skillIds}
+          existingArchetypeIds={packIndex.archetypeIds}
           onClose={() => setCreateKind(null)}
           onApply={(out) => {
             void applyMultiFileWrite(out.files)
-            setCreateKind(null)
-            setStatusMessage('Archetype added. Save the file to keep it.')
           }}
         />
       ) : null}
@@ -1685,14 +1764,58 @@ function App() {
         <ReagentWizardDialog
           files={effectiveFiles}
           packName={mythicPackName}
-          existingReagentIds={effectiveFiles
-            .filter((f) => f.category === 'reagents')
-            .flatMap((f) => f.ids)}
+          existingReagentIds={packIndex.reagentIds}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+          }}
+        />
+      ) : null}
+      {(createKind === 'equipment-set') && crucibleEnabled ? (
+        <EquipmentSetWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingSetIds={packIndex.equipmentSetIds}
+          crucibleEnabled={crucibleEnabled}
           onClose={() => setCreateKind(null)}
           onApply={(out) => {
             void applyMultiFileWrite(out.files)
             setCreateKind(null)
-            setStatusMessage('Reagent added. Save the file to keep it.')
+            setStatusMessage('Equipment set added. Save the file to keep it.')
+          }}
+        />
+      ) : null}
+      {createKind === 'augment-type' && crucibleEnabled ? (
+        <AugmentTypeWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingTypeIds={packIndex.augmentTypeIds}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Augment type added. Save the file to keep it.')
+          }}
+        />
+      ) : null}
+      {(createKind === 'crucible-item' || createKind === 'bag') && crucibleEnabled ? (
+        <CrucibleItemWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingItemIds={packIndex.itemIds}
+          equipmentSetIds={packIndex.equipmentSetIds}
+          augmentTypeIds={packIndex.augmentTypeIds}
+          crucibleEnabled={crucibleEnabled}
+          initialAsBag={createKind === 'bag'}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage(
+              createKind === 'bag'
+                ? 'Bag added. Save the file to keep it.'
+                : 'Crucible item added. Save the file to keep it.',
+            )
           }}
         />
       ) : null}

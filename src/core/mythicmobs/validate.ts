@@ -1,5 +1,6 @@
 import type { FileRecord, ValidationIssue } from '../../types'
 import { parseYaml } from '../yaml/parseYaml'
+import { collectMobsFromFiles, getMobField, resolveMob, type MobBody } from './templates'
 
 /** Extract skill IDs from a Skills list entry (bare ID or skill{s=ID}). */
 function skillRefFromToken(token: string): string | null {
@@ -57,24 +58,24 @@ export function validateMobSkillReferences(files: FileRecord[]): ValidationIssue
     for (const id of file.ids) skillIds.add(id)
   }
 
+  const { mobs, fileByMobId } = collectMobsFromFiles(files, parseYaml)
   const issues: ValidationIssue[] = []
-  for (const file of files) {
-    if (file.category !== 'mobs') continue
-    const parsed = parseYaml(file.content).data
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
-    const mobs = parsed as Record<string, Record<string, unknown>>
-    for (const mobId of Object.keys(mobs)) {
-      const mobDef = mobs[mobId]
-      for (const ref of extractSkillRefs(mobDef?.Skills)) {
-        if (!skillIds.has(ref)) {
-          issues.push({
-            type: 'missing_skill_reference',
-            filePath: file.path,
-            entityId: mobId,
-            missingId: ref,
-          })
-        }
-      }
+  const seen = new Set<string>()
+
+  for (const mobId of Object.keys(mobs)) {
+    const resolved = resolveMob(mobId, mobs)
+    const skills = getMobField(resolved.body as MobBody, 'Skills')
+    for (const ref of extractSkillRefs(skills)) {
+      if (skillIds.has(ref)) continue
+      const key = `${mobId}:${ref}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      issues.push({
+        type: 'missing_skill_reference',
+        filePath: fileByMobId[mobId] ?? '',
+        entityId: mobId,
+        missingId: ref,
+      })
     }
   }
   return issues
@@ -142,10 +143,96 @@ export function validateRandomSpawnMobReferences(files: FileRecord[]): Validatio
   return issues
 }
 
+function idSetLower(ids: Iterable<string>): Set<string> {
+  const set = new Set<string>()
+  for (const id of ids) set.add(id.toLowerCase())
+  return set
+}
+
+function collectAugmentTypeRefs(itemDef: Record<string, unknown>): string[] {
+  const refs: string[] = []
+  const pushType = (block: unknown) => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) return
+    const type = (block as Record<string, unknown>).Type
+    if (typeof type === 'string' && type.trim()) refs.push(type.trim())
+  }
+
+  pushType(itemDef.Augmentation)
+  pushType(itemDef.AugmentationSocket)
+  pushType(itemDef.AugmentationRemover)
+
+  const slots = itemDef.AugmentationSlots
+  if (Array.isArray(slots)) {
+    for (const entry of slots) pushType(entry)
+  } else {
+    pushType(slots)
+  }
+  return refs
+}
+
+/** Item EquipmentSet / augment Type refs against pack set and augment type IDs. */
+export function validateCrucibleItemReferences(files: FileRecord[]): ValidationIssue[] {
+  const setIds = idSetLower(
+    files.filter((f) => f.category === 'equipment-sets').flatMap((f) => f.ids),
+  )
+  const augmentIds = idSetLower(
+    files.filter((f) => f.category === 'augments').flatMap((f) => f.ids),
+  )
+  if (setIds.size === 0 && augmentIds.size === 0) {
+    // Still validate when sets/augments are empty so missing refs surface
+  }
+
+  const issues: ValidationIssue[] = []
+  const seen = new Set<string>()
+
+  for (const file of files) {
+    if (file.category !== 'items') continue
+    const parsed = parseYaml(file.content).data
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue
+    const items = parsed as Record<string, Record<string, unknown>>
+    for (const itemId of Object.keys(items)) {
+      const itemDef = items[itemId]
+      if (!itemDef || typeof itemDef !== 'object') continue
+
+      const setRef = itemDef.EquipmentSet
+      if (typeof setRef === 'string' && setRef.trim()) {
+        const id = setRef.trim()
+        if (!setIds.has(id.toLowerCase())) {
+          const key = `set:${itemId}:${id}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            issues.push({
+              type: 'missing_equipment_set_reference',
+              filePath: file.path,
+              entityId: itemId,
+              missingId: id,
+            })
+          }
+        }
+      }
+
+      for (const typeRef of collectAugmentTypeRefs(itemDef)) {
+        if (augmentIds.has(typeRef.toLowerCase())) continue
+        const key = `aug:${itemId}:${typeRef}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        issues.push({
+          type: 'missing_augment_type_reference',
+          filePath: file.path,
+          entityId: itemId,
+          missingId: typeRef,
+        })
+      }
+    }
+  }
+  return issues
+}
+
 export function validatePack(files: FileRecord[]): ValidationIssue[] {
   return [
     ...validateMobSkillReferences(files),
     ...validateDroptableReferences(files),
     ...validateRandomSpawnMobReferences(files),
+    ...validateCrucibleItemReferences(files),
   ]
 }

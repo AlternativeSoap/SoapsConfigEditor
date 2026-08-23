@@ -24,8 +24,8 @@ export const WORKSPACES: WorkspaceProfile[] = [
   {
     id: 'mythicmobs',
     name: 'MythicMobs',
-    summary: 'Packs, mobs, items, skills, and drop tables.',
-    hint: 'Open your server plugins/ folder (or MythicMobs/), or start a new pack. New packs write to MythicMobs/Packs/{name}/. Use the add-on switches on the MythicMobs tile if you use MythicRPG or Crucible.',
+    summary: 'Packs for mobs, items, skills, and drops.',
+    hint: 'Open your plugins/ folder, or start a new pack under MythicMobs/Packs/.',
     tools: ['Mob generator', 'Item generator', 'Start new pack'],
     startLabel: 'Start new pack',
     startDialogTitle: 'Start new pack',
@@ -35,9 +35,8 @@ export const WORKSPACES: WorkspaceProfile[] = [
   {
     id: 'mmocore',
     name: 'MMOCore',
-    summary: 'Classes, MythicLib skills, and linked MythicMobs stubs.',
-    hint:
-      'Open a folder that contains MMOCore/, MythicLib/, and MythicMobs/ side by side (as on a server under plugins/), or start a new workspace. Only MythicMobs uses a Packs/ folder.',
+    summary: 'Classes and MythicLib skills.',
+    hint: 'Open a folder with MMOCore/, MythicLib/, and MythicMobs/, or start a new workspace.',
     tools: ['Class creator', 'Skill stub', 'Start new workspace'],
     startLabel: 'Start new workspace',
     startDialogTitle: 'Start new workspace',
@@ -47,8 +46,8 @@ export const WORKSPACES: WorkspaceProfile[] = [
   {
     id: 'mmoitems',
     name: 'MMOItems',
-    summary: 'Item types, templates, and item configs.',
-    hint: 'Open your MMOItems plugin folder (plugins/MMOItems/), or start starter files under MMOItems/item/. MMOItems does not use a MythicMobs-style Packs system.',
+    summary: 'Item types and templates.',
+    hint: 'Open plugins/MMOItems/, or start starter files under MMOItems/item/.',
     tools: ['Start starter files'],
     startLabel: 'Start starter files',
     startDialogTitle: 'Start MMOItems starter',
@@ -59,8 +58,7 @@ export const WORKSPACES: WorkspaceProfile[] = [
     id: 'soapsquest',
     name: 'SoapsQuest',
     summary: 'Quest papers, tiers, and difficulties.',
-    hint:
-      'Open your SoapsQuest plugin folder (plugins/SoapsQuest/), or start a new workspace. SoapsQuest has no Packs/ system.',
+    hint: 'Open plugins/SoapsQuest/, or start a new workspace.',
     tools: ['Quest creator', 'Start new workspace'],
     compact: true,
     startLabel: 'Start new workspace',
@@ -71,8 +69,8 @@ export const WORKSPACES: WorkspaceProfile[] = [
   {
     id: 'soapstraits',
     name: 'SoapsTraits',
-    summary: 'Trait configs for SoapsTraits.',
-    hint: 'Open your SoapsTraits plugin folder (plugins/SoapsTraits/), or start a traits.yml starter.',
+    summary: 'Trait configs.',
+    hint: 'Open plugins/SoapsTraits/, or start a traits.yml file.',
     tools: ['Start starter files'],
     compact: true,
     startLabel: 'Start starter files',

@@ -13,6 +13,8 @@ export const CATEGORY_LABEL: Record<MythicCategory, string> = {
   archetypes: 'Archetypes',
   reagents: 'Reagents',
   quests: 'Quests',
+  'equipment-sets': 'Equipment sets',
+  augments: 'Augments',
   other: 'Other',
 }
 

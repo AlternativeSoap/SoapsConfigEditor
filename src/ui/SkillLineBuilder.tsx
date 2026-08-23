@@ -4,8 +4,8 @@ import {
   serializeSkillLineParts,
   type SkillLineCondition,
 } from '../core/mythicmobs/skillLineParts'
-import { CONDITIONS, toInlineConditionSnippet } from '../data/mythicmobs/conditions'
-import { MECHANICS } from '../data/mythicmobs/mechanics'
+import { resolveMythicCatalogs } from '../core/mythicmobs/resolveCatalogs'
+import { toInlineConditionSnippet } from '../data/mythicmobs/conditions'
 import {
   PRESET_CATEGORY_LABELS,
   SKILL_PRESETS,
@@ -13,21 +13,29 @@ import {
   type PresetCategory,
   type SkillPreset,
 } from '../data/mythicmobs/projectilePresets'
-import { TARGETERS } from '../data/mythicmobs/targeters'
-import { TRIGGERS } from '../data/mythicmobs/triggers'
 
 interface SkillLineBuilderProps {
   value: string
   onConfirm: (line: string) => void
   onClose: () => void
   hideTriggers?: boolean
+  /** When true, includes Crucible mechanics, targeters, triggers, and conditions. */
+  crucibleEnabled?: boolean
   /** Loads cast lines into the create form and copies full YAML to the clipboard. */
   onApplyPresetPack?: (preset: SkillPreset) => void
 }
 
 type DropdownKind = 'mech' | 'targ' | 'trig' | 'cond'
 
-export function SkillLineBuilder({ value, onConfirm, onClose, hideTriggers, onApplyPresetPack }: SkillLineBuilderProps) {
+export function SkillLineBuilder({
+  value,
+  onConfirm,
+  onClose,
+  hideTriggers,
+  crucibleEnabled = false,
+  onApplyPresetPack,
+}: SkillLineBuilderProps) {
+  const catalogs = useMemo(() => resolveMythicCatalogs(crucibleEnabled), [crucibleEnabled])
   const parsed = parseSkillLineParts(value)
   const [mechanic, setMechanic] = useState(parsed.mechanic)
   const [targeter, setTargeter] = useState(parsed.targeter)
@@ -90,7 +98,7 @@ export function SkillLineBuilder({ value, onConfirm, onClose, hideTriggers, onAp
     healthPercent,
   })
 
-  const filteredMechanics = MECHANICS.filter(
+  const filteredMechanics = catalogs.mechanics.filter(
     (m) =>
       !mechSearch ||
       m.id.toLowerCase().includes(mechSearch.toLowerCase()) ||
@@ -98,7 +106,7 @@ export function SkillLineBuilder({ value, onConfirm, onClose, hideTriggers, onAp
   )
   const mechanicOptions = filteredMechanics.slice(0, 50)
 
-  const filteredTargeters = TARGETERS.filter(
+  const filteredTargeters = catalogs.targeters.filter(
     (t) =>
       !targSearch ||
       t.id.toLowerCase().includes(targSearch.toLowerCase()) ||
@@ -106,18 +114,18 @@ export function SkillLineBuilder({ value, onConfirm, onClose, hideTriggers, onAp
   )
   const targeterOptions = filteredTargeters.slice(0, 40)
 
-  const filteredTriggers = TRIGGERS.filter(
+  const filteredTriggers = catalogs.triggers.filter(
     (t) => !trigSearch || t.id.toLowerCase().includes(trigSearch.toLowerCase()),
   )
   const triggerOptions = filteredTriggers.slice(0, 40)
 
-  const filteredConditions = CONDITIONS.filter(
+  const filteredConditions = catalogs.conditions.filter(
     (c) => !condSearch || c.id.toLowerCase().includes(condSearch.toLowerCase()),
   )
   const conditionOptions = filteredConditions.slice(0, 40)
 
   function addCondition(idOrSnippet: string, invert = false) {
-    const entry = CONDITIONS.find((c) => c.id === idOrSnippet)
+    const entry = catalogs.conditions.find((c) => c.id === idOrSnippet)
     const snippet = toInlineConditionSnippet(entry?.insertSnippet ?? idOrSnippet).replace(/^[!?]/, '')
     if (!snippet) return
     if (!conditions.find((c) => c.id === snippet)) {

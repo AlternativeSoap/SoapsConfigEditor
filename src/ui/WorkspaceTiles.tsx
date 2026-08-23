@@ -1,6 +1,7 @@
+import type { CSSProperties } from 'react'
 import type { WorkspaceKind } from '../types'
 import type { MythicAddons } from '../core/workspaces/mythicAddons'
-import { WORKSPACES, mythicToolsLabel } from '../core/workspaces/profiles'
+import { WORKSPACES } from '../core/workspaces/profiles'
 import { Switch } from './Switch'
 
 interface WorkspaceTilesProps {
@@ -18,22 +19,25 @@ export function WorkspaceTiles({
 }: WorkspaceTilesProps) {
   const primary = WORKSPACES.filter((w) => !w.compact)
   const compact = WORKSPACES.filter((w) => w.compact)
+  const focused = selected != null
 
   return (
-    <div className="tile-layout">
+    <div className={focused ? 'tile-layout is-focused' : 'tile-layout'}>
       <div className="tile-grid">
-        {primary.map((workspace) => {
+        {primary.map((workspace, index) => {
           const active = selected === workspace.id
-          const tools =
-            workspace.id === 'mythicmobs'
-              ? mythicToolsLabel(mythicAddons.mythicrpg)
-              : workspace.tools
+          const delayStyle = { '--tile-delay': `${0.04 + index * 0.06}s` } as CSSProperties
 
           if (workspace.id === 'mythicmobs') {
             return (
               <div
                 key={workspace.id}
-                className={active ? 'workspace-tile workspace-tile-mythic active' : 'workspace-tile workspace-tile-mythic'}
+                className={
+                  active
+                    ? 'workspace-tile workspace-tile-mythic active'
+                    : 'workspace-tile workspace-tile-mythic'
+                }
+                style={delayStyle}
               >
                 <button
                   type="button"
@@ -42,9 +46,6 @@ export function WorkspaceTiles({
                 >
                   <h2>{workspace.name}</h2>
                   <p>{workspace.summary}</p>
-                  <span className="tile-meta">
-                    {tools.length > 0 ? tools.join(' · ') : 'YAML editor'}
-                  </span>
                 </button>
                 <div
                   className="tile-addons"
@@ -55,7 +56,7 @@ export function WorkspaceTiles({
                   <div className="tile-addon-row">
                     <div className="tile-addon-copy">
                       <span className="tile-addon-title">MythicRPG</span>
-                      <span className="tile-addon-hint">Spells, archetypes, and reagents</span>
+                      <span className="tile-addon-hint">Spells, archetypes, reagents</span>
                     </div>
                     <Switch
                       size="sm"
@@ -67,13 +68,13 @@ export function WorkspaceTiles({
                   <div className="tile-addon-row">
                     <div className="tile-addon-copy">
                       <span className="tile-addon-title">Crucible</span>
-                      <span className="tile-addon-hint">Remembered for later. Extra item tools are not available yet.</span>
+                      <span className="tile-addon-hint">Items, bags, sets, augments</span>
                     </div>
                     <Switch
                       size="sm"
                       checked={mythicAddons.crucible}
                       onChange={(next) => onMythicAddonsChange({ crucible: next })}
-                      aria-label="Remember Crucible add-on"
+                      aria-label="Enable Crucible tools"
                     />
                   </div>
                 </div>
@@ -86,13 +87,11 @@ export function WorkspaceTiles({
               key={workspace.id}
               type="button"
               className={active ? 'workspace-tile active' : 'workspace-tile'}
+              style={delayStyle}
               onClick={() => onSelect(workspace.id)}
             >
               <h2>{workspace.name}</h2>
               <p>{workspace.summary}</p>
-              <span className="tile-meta">
-                {tools.length > 0 ? tools.join(' · ') : 'YAML editor'}
-              </span>
             </button>
           )
         })}
@@ -100,8 +99,11 @@ export function WorkspaceTiles({
 
       {compact.length > 0 ? (
         <div className="tile-grid tile-grid-compact" aria-label="Soaps plugins">
-          {compact.map((workspace) => {
+          {compact.map((workspace, index) => {
             const active = selected === workspace.id
+            const delayStyle = {
+              '--tile-delay': `${0.04 + (primary.length + index) * 0.06}s`,
+            } as CSSProperties
             return (
               <button
                 key={workspace.id}
@@ -111,13 +113,11 @@ export function WorkspaceTiles({
                     ? 'workspace-tile workspace-tile-compact active'
                     : 'workspace-tile workspace-tile-compact'
                 }
+                style={delayStyle}
                 onClick={() => onSelect(workspace.id)}
               >
                 <h2>{workspace.name}</h2>
                 <p>{workspace.summary}</p>
-                <span className="tile-meta">
-                  {workspace.tools.length > 0 ? workspace.tools.join(' · ') : 'YAML editor'}
-                </span>
               </button>
             )
           })}

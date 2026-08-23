@@ -9,6 +9,7 @@ export type YamlListParent =
   | 'AIGoalSelectors'
   | 'AITargetSelectors'
   | 'Options'
+  | 'Exclude'
   | null
 
 export interface YamlEditContext {
@@ -29,6 +30,7 @@ const PARENT_KEY_ALIASES: Record<string, YamlListParent> = {
   aigoalselectors: 'AIGoalSelectors',
   aitargetselectors: 'AITargetSelectors',
   options: 'Options',
+  exclude: 'Exclude',
 }
 
 /** Normalize YAML parent keys to canonical MythicMobs casing (skills → Skills). */
@@ -67,8 +69,8 @@ export function detectYamlEditContext(doc: Text, lineNumber: number, fileCategor
 }
 
 export const MOB_BODY_KEYS = [
-  'Type', 'Display', 'Health', 'Damage', 'Skills', 'Drops', 'Equipment', 'Options',
-  'AIGoalSelectors', 'AITargetSelectors', 'Modules', 'Faction', 'Level', 'KillMessages',
+  'Type', 'Display', 'Health', 'Damage', 'Armor', 'Faction', 'Template', 'Exclude', 'Skills', 'Drops', 'Equipment', 'Options',
+  'AIGoalSelectors', 'AITargetSelectors', 'Modules', 'Level', 'KillMessages',
   'Disguise', 'BossBar', 'ThreatTable', 'DamageModifiers', 'ImmunityTables',
 ]
 

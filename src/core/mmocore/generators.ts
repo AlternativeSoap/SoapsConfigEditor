@@ -585,12 +585,21 @@ export function runClassPreflight(
   const mmIds = new Set(index.mythicMobsSkillIds)
   const resolvedSkills = resolveClassSkills(input)
   const attackPrefix = input.attackSkillPrefix.trim().toLowerCase()
-  const syncingAttackSkills =
-    input.includeAttackSkills && input.syncElementRow && Boolean(attackPrefix)
-  const syncedAttackIds = syncingAttackSkills
-    ? new Set([`${attackPrefix}_regular_attack`, `${attackPrefix}_critical_strike`])
-    : new Set<string>()
+  const attackSkillIds =
+    input.includeAttackSkills && attackPrefix
+      ? new Set([`${attackPrefix}_regular_attack`, `${attackPrefix}_critical_strike`])
+      : new Set<string>()
   const builtinIds = new Set(BUILTIN_SKILL_IDS.map((s) => s.id))
+
+  if (input.includeAttackSkills && !input.syncElementRow && attackPrefix) {
+    const missing = [...attackSkillIds].filter((id) => !mlIds.has(id) && !creatingSkills.has(id))
+    if (missing.length > 0) {
+      items.push({
+        level: 'warning',
+        message: `Attack skills (${missing.join(', ')}) are bound on the class but will not be registered until you turn on “Update MythicLib/elements.yml”, or add them under MythicLib/skill yourself.`,
+      })
+    }
+  }
 
   for (const skill of input.skills) {
     if (skill.isNew && mlIds.has(skill.id)) {
@@ -606,7 +615,7 @@ export function runClassPreflight(
       mlIds.has(skill.id) ||
       creatingSkills.has(skill.id) ||
       skill.isNew ||
-      syncedAttackIds.has(skill.id) ||
+      attackSkillIds.has(skill.id) ||
       builtinIds.has(skill.id)
     if (!knownMl) {
       items.push({

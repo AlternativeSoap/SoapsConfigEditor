@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CreateKind, WorkspaceKind } from '../types'
 import type { MythicAddons } from '../core/workspaces/mythicAddons'
 
@@ -23,6 +23,13 @@ const MYTHIC_RPG_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'reagent', label: 'New reagent' },
 ]
 
+const MYTHIC_CRUCIBLE_ITEMS: { kind: CreateKind; label: string }[] = [
+  { kind: 'equipment-set', label: 'New equipment set' },
+  { kind: 'augment-type', label: 'New augment type' },
+  { kind: 'crucible-item', label: 'New Crucible item' },
+  { kind: 'bag', label: 'New bag' },
+]
+
 const MMOCORE_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'class', label: 'New class' },
   { kind: 'mmocore-skill', label: 'New skill' },
@@ -34,18 +41,46 @@ const SOAPSQUEST_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'quest', label: 'New quest' },
 ]
 
+function MenuSection({
+  label,
+  items,
+  onCreate,
+  onPicked,
+}: {
+  label?: string
+  items: { kind: CreateKind; label: string }[]
+  onCreate: (kind: CreateKind) => void
+  onPicked: () => void
+}): ReactNode {
+  if (items.length === 0) return null
+  return (
+    <>
+      {label ? (
+        <div className="new-menu-section" role="presentation">
+          {label}
+        </div>
+      ) : null}
+      {items.map((item) => (
+        <button
+          key={item.kind}
+          type="button"
+          role="menuitem"
+          className="new-menu-item"
+          onClick={() => {
+            onPicked()
+            onCreate(item.kind)
+          }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </>
+  )
+}
+
 export function NewMenu({ disabled, workspace, mythicAddons, onCreate }: NewMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const items =
-    workspace === 'mmocore'
-      ? MMOCORE_ITEMS
-      : workspace === 'soapsquest'
-        ? SOAPSQUEST_ITEMS
-        : [
-            ...MYTHIC_ITEMS,
-            ...(mythicAddons?.mythicrpg ? MYTHIC_RPG_ITEMS : []),
-          ]
 
   useEffect(() => {
     if (!open) return
@@ -79,20 +114,27 @@ export function NewMenu({ disabled, workspace, mythicAddons, onCreate }: NewMenu
       </button>
       {open ? (
         <div className="new-menu-dropdown" role="menu">
-          {items.map((item) => (
-            <button
-              key={item.kind}
-              type="button"
-              role="menuitem"
-              className="new-menu-item"
-              onClick={() => {
-                setOpen(false)
-                onCreate(item.kind)
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+          {workspace === 'mmocore' ? (
+            <MenuSection items={MMOCORE_ITEMS} onCreate={onCreate} onPicked={() => setOpen(false)} />
+          ) : workspace === 'soapsquest' ? (
+            <MenuSection items={SOAPSQUEST_ITEMS} onCreate={onCreate} onPicked={() => setOpen(false)} />
+          ) : (
+            <>
+              <MenuSection items={MYTHIC_ITEMS} onCreate={onCreate} onPicked={() => setOpen(false)} />
+              <MenuSection
+                label="MythicRPG"
+                items={mythicAddons?.mythicrpg ? MYTHIC_RPG_ITEMS : []}
+                onCreate={onCreate}
+                onPicked={() => setOpen(false)}
+              />
+              <MenuSection
+                label="Crucible"
+                items={mythicAddons?.crucible ? MYTHIC_CRUCIBLE_ITEMS : []}
+                onCreate={onCreate}
+                onPicked={() => setOpen(false)}
+              />
+            </>
+          )}
         </div>
       ) : null}
     </div>

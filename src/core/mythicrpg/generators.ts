@@ -185,7 +185,7 @@ export function generateMaxManaStatYaml(baseValue: number): string {
 
 /** Suggest pack-relative paths for MythicRPG content. */
 export function suggestSpellPath(packRoot: string): string {
-  return `${packRoot}/skills/skills.yml`
+  return `${packRoot}/Skills/skills.yml`
 }
 
 export function suggestArchetypePath(packRoot: string): string {
@@ -198,6 +198,22 @@ export function suggestReagentPath(packRoot: string): string {
 
 export function suggestStatsPath(packRoot: string): string {
   return `${packRoot}/stats.yml`
+}
+
+export function suggestExperienceCurvesPath(packRoot: string): string {
+  return `${packRoot}/experience-curves.yml`
+}
+
+export function suggestExperienceSourcesPath(packRoot: string): string {
+  return `${packRoot}/experience-sources.yml`
+}
+
+/** True if YAML content already defines a top-level key (case-sensitive id). */
+export function yamlHasTopLevelKey(content: string, id: string): boolean {
+  const key = id.trim()
+  if (!key) return false
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${escaped}\\s*:`, 'm').test(content)
 }
 
 /**

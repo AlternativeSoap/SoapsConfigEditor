@@ -4,6 +4,7 @@ import {
   generateMaxManaStatYaml,
   generateReagentYaml,
   generateSpellYaml,
+  yamlHasTopLevelKey,
 } from './generators'
 import { ARCHETYPE_PRESETS, REAGENT_PRESETS, SPELL_PRESETS } from '../../data/mythicrpg/presets'
 import { classifyMythicCategory } from '../mythicmobs/classify'
@@ -54,6 +55,8 @@ describe('mythicrpg classify and scaffold', () => {
     })
     expect(files.some((f) => f.path.includes('Archetypes/classes.yml'))).toBe(true)
     expect(files.some((f) => f.path.endsWith('reagents.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('experience-curves.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('experience-sources.yml'))).toBe(true)
   })
 
   it('does not scaffold RPG files when MythicRPG addon is off', () => {
@@ -63,6 +66,13 @@ describe('mythicrpg classify and scaffold', () => {
     })
     expect(files.some((f) => f.path.includes('Archetypes'))).toBe(false)
     expect(files.some((f) => f.path.endsWith('reagents.yml'))).toBe(false)
+  })
+})
+
+describe('yamlHasTopLevelKey', () => {
+  it('detects existing top-level ids', () => {
+    expect(yamlHasTopLevelKey('Mana:\n  Display: Mana\n', 'Mana')).toBe(true)
+    expect(yamlHasTopLevelKey('Mana:\n  Display: Mana\n', 'Stamina')).toBe(false)
   })
 })
 

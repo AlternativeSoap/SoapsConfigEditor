@@ -7,6 +7,7 @@ import {
   suggestMythicMobsSkillPath,
 } from '../../core/mmocore/generators'
 import { DAMAGE_TYPE_CHIPS, DEFAULT_ELEMENT_IDS } from '../../data/mmocore/triggers'
+import { extractTopLevelIds, parseYaml } from '../../core/yaml/parseYaml'
 import type { FileRecord, SkillModifierValues } from '../../types'
 
 export interface SkillStubOutput {
@@ -101,6 +102,33 @@ export function CreateMythicLibSkillDialog({
       .split(/[,\s]+/)
       .map((t) => t.trim().toUpperCase())
       .filter(Boolean)
+    const classHint = resolvedCats[0]?.toLowerCase() || 'custom'
+    const mlPath = suggestMythicLibSkillPath(classHint)
+    const mmPath = suggestMythicMobsSkillPath(packName, classHint)
+
+    const existingMl = files.find((f) => f.path === mlPath)
+    const existingMm = files.find((f) => f.path === mmPath)
+
+    const mlIds = new Set(
+      existingMl ? extractTopLevelIds(parseYaml(existingMl.content).data) : [],
+    )
+    const mmIds = new Set(
+      existingMm ? extractTopLevelIds(parseYaml(existingMm.content).data) : [],
+    )
+    if (mlIds.has(skillId) || mmIds.has(skillId)) {
+      setError(`Skill ${skillId} is already in the target YAML file.`)
+      return
+    }
+
+    const packsRoot = `MythicMobs/Packs/${packName}/`
+    const hasPackFolder = files.some((f) => f.path.replace(/\\/g, '/').startsWith(packsRoot))
+    if (!existingMm && !hasPackFolder && files.some((f) => /MythicMobs/i.test(f.path))) {
+      setError(
+        `No MythicMobs pack folder at ${packsRoot}. Open a workspace with that pack, or start a Class Pack workspace first.`,
+      )
+      return
+    }
+
     const mlYaml = generateMythicLibSkillYaml({
       id: skillId,
       name: name.trim() || skillId,
@@ -115,28 +143,16 @@ export function CreateMythicLibSkillDialog({
       damageTypes: types,
       damageElement: damageElement.trim() || resolvedCats[0],
     })
-    const classHint = resolvedCats[0]?.toLowerCase() || 'custom'
-    const mlPath = suggestMythicLibSkillPath(classHint)
-    const mmPath = suggestMythicMobsSkillPath(packName, classHint)
-    const existingMl =
-      files.find((f) => f.path === mlPath) ??
-      files.find((f) => /MythicLib\/skill\/.*_MMOCORE\.yml$/i.test(f.path))
-    const existingMm =
-      files.find((f) => f.path === mmPath) ??
-      files.find((f) => f.path.includes('MythicMobs') && f.path.includes('/Skills/'))
-
-    const mlTarget = existingMl?.path ?? mlPath
-    const mmTarget = existingMm?.path ?? mmPath
 
     onApply({
       files: [
         {
-          path: mlTarget,
+          path: mlPath,
           content: existingMl ? `${existingMl.content.trimEnd()}\n\n${mlYaml}` : mlYaml,
           mode: existingMl ? 'append' : 'create',
         },
         {
-          path: mmTarget,
+          path: mmPath,
           content: existingMm ? `${existingMm.content.trimEnd()}\n\n${mmYaml}` : mmYaml,
           mode: existingMm ? 'append' : 'create',
         },

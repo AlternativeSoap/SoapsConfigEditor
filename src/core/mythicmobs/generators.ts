@@ -10,6 +10,15 @@ export function yamlQuoted(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
+function multilineListBlock(key: string, raw: string | undefined): string {
+  const lines = (raw ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return ''
+  return [`  ${key}:`, ...lines.map((line) => `    - ${line}`)].join('\n') + '\n'
+}
+
 export function generateMobYaml(input: MobGeneratorInput): string {
   const skills = input.skills
     .split('\n')
@@ -44,12 +53,33 @@ export function generateMobYaml(input: MobGeneratorInput): string {
       ? ''
       : ['  Equipment:', ...equipLines].join('\n') + '\n'
 
+  const factionLine = input.faction?.trim() ? `  Faction: ${input.faction.trim()}\n` : ''
+  const armorLine =
+    input.armor !== '' && input.armor !== undefined && Number.isFinite(Number(input.armor))
+      ? `  Armor: ${input.armor}\n`
+      : ''
+
+  const optionEntries = Object.entries(input.options ?? {})
+  const optionsBlock =
+    optionEntries.length === 0
+      ? ''
+      : [
+          '  Options:',
+          ...optionEntries.map(([key, value]) => {
+            if (typeof value === 'boolean') return `    ${key}: ${value ? 'true' : 'false'}`
+            return `    ${key}: ${value}`
+          }),
+        ].join('\n') + '\n'
+
+  const aiGoalsBlock = multilineListBlock('AIGoalSelectors', input.aiGoalSelectors)
+  const aiTargetsBlock = multilineListBlock('AITargetSelectors', input.aiTargetSelectors)
+
   return `${input.id}:
   Type: ${input.type}
   Display: ${yamlQuoted(input.display)}
   Health: ${input.health}
   Damage: ${input.damage}
-${dropsBlock}${equipBlock}${skillBlock}
+${factionLine}${armorLine}${optionsBlock}${aiGoalsBlock}${aiTargetsBlock}${dropsBlock}${equipBlock}${skillBlock}
 `
 }
 

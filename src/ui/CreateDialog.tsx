@@ -1,12 +1,18 @@
 import { useMemo, useRef, useState } from 'react'
 import {
+  defaultYamlFileNameFromId,
+  joinPath,
+  resolveCreateFolder,
+  sanitizeYamlFileName,
+} from '../core/mythicmobs/createTarget'
+import {
   generateDroptableYaml,
   generateItemYaml,
   generateMobYaml,
   generateRandomSpawnYaml,
   generateSkillYaml,
 } from '../core/mythicmobs/generators'
-import { mobSkillReference, presetCastLines, type SkillPreset } from '../data/mythicmobs/projectilePresets'
+import { mobSkillReference, type SkillPreset } from '../data/mythicmobs/projectilePresets'
 import type {
   CreateKind,
   DropEntry,
@@ -20,6 +26,11 @@ import type {
 } from '../types'
 import { ColorTextField } from './ColorTextField'
 import { SkillLineBuilder } from './SkillLineBuilder'
+import { Switch } from './Switch'
+import {
+  MOB_OPTIONS,
+  mobOptionByName,
+} from '../data/mythicmobs/mobOptions'
 
 const EQUIPMENT_SLOTS = ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HAND', 'OFFHAND'] as const
 
@@ -42,6 +53,10 @@ type MythicCreateKind = Exclude<
   | 'archetype'
   | 'reagent'
   | 'quest'
+  | 'equipment-set'
+  | 'augment-type'
+  | 'crucible-item'
+  | 'bag'
 >
 
 interface CreateDialogProps {
@@ -49,11 +64,15 @@ interface CreateDialogProps {
   files: FileRecord[]
   packIndex: PackIndex
   suggestedPath: string
+  crucibleEnabled?: boolean
   onClose: () => void
   onInsert: (targetPath: string, yaml: string) => void
 }
 
-const CATEGORY_FOR_KIND: Record<MythicCreateKind, string> = {
+const CATEGORY_FOR_KIND: Record<
+  MythicCreateKind,
+  'mobs' | 'items' | 'skills' | 'droptables' | 'randomspawns'
+> = {
   mob: 'mobs',
   item: 'items',
   skill: 'skills',
@@ -71,8 +90,7 @@ const TITLE_FOR_KIND: Record<MythicCreateKind, string> = {
 
 function preferredFiles(kind: MythicCreateKind, files: FileRecord[]): FileRecord[] {
   const category = CATEGORY_FOR_KIND[kind]
-  const matched = files.filter((file) => file.category === category)
-  return matched.length > 0 ? matched : files
+  return files.filter((file) => file.category === category)
 }
 
 const emptyMob: MobGeneratorInput = {
@@ -84,6 +102,11 @@ const emptyMob: MobGeneratorInput = {
   skills: '',
   drops: '',
   equipment: {},
+  options: {},
+  faction: '',
+  armor: '',
+  aiGoalSelectors: '',
+  aiTargetSelectors: '',
 }
 
 const emptyItem: ItemGeneratorInput = {
@@ -137,16 +160,29 @@ export function CreateDialog({
   files,
   packIndex,
   suggestedPath,
+  crucibleEnabled = false,
   onClose,
   onInsert,
 }: CreateDialogProps) {
+  const category = CATEGORY_FOR_KIND[kind]
   const choices = preferredFiles(kind, files)
-  const [targetPath, setTargetPath] = useState(suggestedPath || choices[0]?.path || '')
+  const suggestedInCategory = choices.some((f) => f.path === suggestedPath)
+  const initialExisting =
+    (suggestedInCategory ? suggestedPath : '') || choices[0]?.path || ''
+  const [targetMode, setTargetMode] = useState<'existing' | 'new'>(
+    initialExisting ? 'existing' : 'new',
+  )
+  const [targetPath, setTargetPath] = useState(initialExisting)
   const [mob, setMob] = useState(emptyMob)
+  const [optionSearch, setOptionSearch] = useState('')
   const [item, setItem] = useState(emptyItem)
   const [skill, setSkill] = useState(emptySkill)
   const [droptable, setDroptable] = useState(emptyDroptable)
   const [spawn, setSpawn] = useState(emptySpawn)
+  const [newFileName, setNewFileName] = useState(() =>
+    defaultYamlFileNameFromId(emptyMob.id, kind),
+  )
+  const [newFileNameTouched, setNewFileNameTouched] = useState(false)
   // Skill line builder state — tracks which textarea + line index is being built
   const [builderOpen, setBuilderOpen] = useState(false)
   const [builderContext, setBuilderContext] = useState<{ source: 'mob' | 'skill'; lineIndex: number; value: string } | null>(null)
@@ -159,6 +195,31 @@ export function CreateDialog({
     if (kind === 'droptable') return generateDroptableYaml(droptable)
     return generateRandomSpawnYaml(spawn)
   }, [kind, mob, item, skill, droptable, spawn])
+
+  const createFolder = useMemo(
+    () => resolveCreateFolder(category, files, suggestedPath || initialExisting),
+    [category, files, suggestedPath, initialExisting],
+  )
+
+  const resolvedNewPath = useMemo(
+    () => joinPath(createFolder, sanitizeYamlFileName(newFileName)),
+    [createFolder, newFileName],
+  )
+
+  const effectiveTargetPath = targetMode === 'new' ? resolvedNewPath : targetPath
+
+  const newPathAlreadyExists = useMemo(
+    () =>
+      files.some(
+        (f) => f.path.replace(/\\/g, '/') === resolvedNewPath.replace(/\\/g, '/'),
+      ),
+    [files, resolvedNewPath],
+  )
+
+  function syncNewFileNameFromId(nextId: string) {
+    if (newFileNameTouched) return
+    setNewFileName(defaultYamlFileNameFromId(nextId, kind))
+  }
 
   function updateDrop(index: number, patch: Partial<DropEntry>) {
     setDroptable((prev) => {
@@ -237,7 +298,10 @@ export function CreateDialog({
       >
         <header className="create-header">
           <h2 id="create-title">{TITLE_FOR_KIND[kind]}</h2>
-          <p>Fill in the fields below, choose a target file, then add it. Save afterwards to write the file.</p>
+          <p>
+            Fill in the fields below, then add to an existing YAML file or create a new one in this folder.
+            Save afterwards to write the file.
+          </p>
         </header>
 
         {kind === 'mob' && (
@@ -248,7 +312,14 @@ export function CreateDialog({
               <div className="create-section-body">
                 <label>
                   ID
-                  <input value={mob.id} onChange={(e) => setMob({ ...mob, id: e.target.value })} />
+                  <input
+                    value={mob.id}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setMob({ ...mob, id })
+                      syncNewFileNameFromId(id)
+                    }}
+                  />
                 </label>
                 <label>
                   Type
@@ -273,6 +344,27 @@ export function CreateDialog({
                     type="number"
                     value={mob.damage}
                     onChange={(e) => setMob({ ...mob, damage: Number(e.target.value) || 1 })}
+                  />
+                </label>
+              
+                <label>
+                  Faction
+                  <input
+                    value={mob.faction}
+                    onChange={(e) => setMob({ ...mob, faction: e.target.value })}
+                    placeholder="optional"
+                  />
+                </label>
+                <label>
+                  Armor
+                  <input
+                    type="number"
+                    value={mob.armor}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      setMob({ ...mob, armor: raw === '' ? '' : Number(raw) })
+                    }}
+                    placeholder="optional"
                   />
                 </label>
               </div>
@@ -307,6 +399,7 @@ export function CreateDialog({
                   value={builderContext.value}
                   onConfirm={confirmBuilder}
                   onClose={() => setBuilderOpen(false)}
+                  crucibleEnabled={crucibleEnabled}
                   onApplyPresetPack={applyPresetPack}
                 />
               )}
@@ -325,6 +418,142 @@ export function CreateDialog({
                 placeholder="MY_DROP_TABLE"
               />
             </section>
+
+            
+            <section className="create-section">
+              <h3 className="create-section-title">Options</h3>
+              <p className="create-section-hint">
+                Add Options from the MythicMobs list. Only options you set are written.
+              </p>
+              <div className="mob-option-picker">
+                <input
+                  type="search"
+                  value={optionSearch}
+                  onChange={(e) => setOptionSearch(e.target.value)}
+                  placeholder="Search options…"
+                  aria-label="Search mob options"
+                />
+                {optionSearch.trim() && (
+                  <ul className="mob-option-results">
+                    {MOB_OPTIONS.filter((opt) => {
+                      if (Object.prototype.hasOwnProperty.call(mob.options, opt.name)) return false
+                      const q = optionSearch.trim().toLowerCase()
+                      return (
+                        opt.name.toLowerCase().includes(q) ||
+                        opt.description.toLowerCase().includes(q)
+                      )
+                    })
+                      .slice(0, 12)
+                      .map((opt) => (
+                        <li key={opt.name}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const def =
+                                opt.type === 'boolean'
+                                  ? opt.default === 'true'
+                                  : opt.type === 'number'
+                                    ? Number(opt.default ?? 0)
+                                    : (opt.default ?? '')
+                              setMob({ ...mob, options: { ...mob.options, [opt.name]: def } })
+                              setOptionSearch('')
+                            }}
+                          >
+                            <span className="mob-option-name">{opt.name}</span>
+                            <span className="mob-option-desc">{opt.description}</span>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+              <div className="mob-option-rows">
+                {Object.keys(mob.options).map((name) => {
+                  const entry = mobOptionByName(name)
+                  const value = mob.options[name]
+                  return (
+                    <div key={name} className="mob-option-row">
+                      <span className="mob-option-row-name" title={entry?.description}>
+                        {name}
+                      </span>
+                      {entry?.type === 'boolean' ? (
+                        <Switch
+                          checked={value === true || value === 'true'}
+                          onChange={(next) =>
+                            setMob({ ...mob, options: { ...mob.options, [name]: next } })
+                          }
+                          aria-label={name}
+                          size="sm"
+                        />
+                      ) : entry?.type === 'enum' && entry.values ? (
+                        <select
+                          value={String(value)}
+                          onChange={(e) =>
+                            setMob({ ...mob, options: { ...mob.options, [name]: e.target.value } })
+                          }
+                          aria-label={name}
+                        >
+                          {entry.values.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={entry?.type === 'number' ? 'number' : 'text'}
+                          value={String(value ?? '')}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                            const next =
+                              entry?.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw
+                            setMob({ ...mob, options: { ...mob.options, [name]: next } })
+                          }}
+                          aria-label={name}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="mob-option-remove"
+                        onClick={() => {
+                          const next = { ...mob.options }
+                          delete next[name]
+                          setMob({ ...mob, options: next })
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="create-section">
+              <h3 className="create-section-title">AI selectors</h3>
+              <p className="create-section-hint">
+                One selector per line. Start with clear when replacing vanilla AI.
+              </p>
+              <label className="wide">
+                AIGoalSelectors
+                <textarea
+                  rows={3}
+                  value={mob.aiGoalSelectors}
+                  onChange={(e) => setMob({ ...mob, aiGoalSelectors: e.target.value })}
+                  placeholder={'clear\nmeleeattack\nrandomstroll'}
+                />
+              </label>
+              <label className="wide">
+                AITargetSelectors
+                <textarea
+                  rows={3}
+                  value={mob.aiTargetSelectors}
+                  onChange={(e) => setMob({ ...mob, aiTargetSelectors: e.target.value })}
+                  placeholder={'clear\nplayers'}
+                />
+              </label>
+            </section>
+
 
             <section className="create-section">
               <h3 className="create-section-title">Equipment</h3>
@@ -363,7 +592,14 @@ export function CreateDialog({
               <div className="create-section-body">
                 <label>
                   ID
-                  <input value={item.id} onChange={(e) => setItem({ ...item, id: e.target.value })} />
+                  <input
+                    value={item.id}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setItem({ ...item, id })
+                      syncNewFileNameFromId(id)
+                    }}
+                  />
                 </label>
                 <label>
                   Material
@@ -396,7 +632,14 @@ export function CreateDialog({
               <div className="create-section-body">
                 <label>
                   ID
-                  <input value={skill.id} onChange={(e) => setSkill({ ...skill, id: e.target.value })} />
+                  <input
+                    value={skill.id}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setSkill({ ...skill, id })
+                      syncNewFileNameFromId(id)
+                    }}
+                  />
                 </label>
                 <label>
                   Cooldown (seconds)
@@ -450,6 +693,7 @@ export function CreateDialog({
                   onConfirm={confirmBuilder}
                   onClose={() => setBuilderOpen(false)}
                   hideTriggers
+                  crucibleEnabled={crucibleEnabled}
                   onApplyPresetPack={applyPresetPack}
                 />
               )}
@@ -464,7 +708,14 @@ export function CreateDialog({
               <div className="create-section-body">
                 <label className="wide">
                   ID
-                  <input value={droptable.id} onChange={(e) => setDroptable({ ...droptable, id: e.target.value })} />
+                  <input
+                    value={droptable.id}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setDroptable({ ...droptable, id })
+                      syncNewFileNameFromId(id)
+                    }}
+                  />
                 </label>
               </div>
               <datalist id="dt-item-ids">
@@ -581,7 +832,14 @@ export function CreateDialog({
               <div className="create-section-body">
                 <label>
                   ID
-                  <input value={spawn.id} onChange={(e) => setSpawn({ ...spawn, id: e.target.value })} />
+                  <input
+                    value={spawn.id}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setSpawn({ ...spawn, id })
+                      syncNewFileNameFromId(id)
+                    }}
+                  />
                 </label>
                 <label>
                   Action
@@ -636,16 +894,69 @@ export function CreateDialog({
         )}
 
         <footer className="create-footer">
-          <label className="create-target">
-            Add to file
-            <select value={targetPath} onChange={(e) => setTargetPath(e.target.value)}>
-              {choices.map((file) => (
-                <option key={file.path} value={file.path}>
-                  {file.path}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="create-target">
+            <span className="create-target-label">Destination</span>
+            <div className="segmented-control" role="group" aria-label="Destination">
+              <button
+                type="button"
+                className={targetMode === 'existing' ? 'seg-btn active' : 'seg-btn'}
+                disabled={choices.length === 0}
+                onClick={() => {
+                  setTargetMode('existing')
+                  if (!targetPath && choices[0]) setTargetPath(choices[0].path)
+                }}
+              >
+                Existing file
+              </button>
+              <button
+                type="button"
+                className={targetMode === 'new' ? 'seg-btn active' : 'seg-btn'}
+                onClick={() => setTargetMode('new')}
+              >
+                New file
+              </button>
+            </div>
+
+            {targetMode === 'existing' ? (
+              <label className="create-target-field">
+                Add to file
+                <select
+                  value={targetPath}
+                  onChange={(e) => setTargetPath(e.target.value)}
+                  disabled={choices.length === 0}
+                >
+                  {choices.length === 0 ? (
+                    <option value="">No files in this folder yet</option>
+                  ) : (
+                    choices.map((file) => (
+                      <option key={file.path} value={file.path}>
+                        {file.path}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+            ) : (
+              <label className="create-target-field">
+                File name
+                <input
+                  value={newFileName}
+                  onChange={(e) => {
+                    setNewFileNameTouched(true)
+                    setNewFileName(e.target.value)
+                  }}
+                  placeholder="skeletons.yml"
+                  aria-label="New YAML file name"
+                />
+                <span className="create-target-hint">
+                  Creates {resolvedNewPath}
+                  {newPathAlreadyExists
+                    ? '. That path already exists. Pick another name, or use Existing file.'
+                    : '.'}
+                </span>
+              </label>
+            )}
+          </div>
 
           <details className="create-preview-details">
             <summary>YAML preview</summary>
@@ -659,10 +970,14 @@ export function CreateDialog({
             <button
               type="button"
               className="primary"
-              onClick={() => onInsert(targetPath, yaml)}
-              disabled={!targetPath}
+              onClick={() => onInsert(effectiveTargetPath, yaml)}
+              disabled={
+                !effectiveTargetPath ||
+                (targetMode === 'new' && newPathAlreadyExists) ||
+                (targetMode === 'existing' && !targetPath)
+              }
             >
-              Add to file
+              {targetMode === 'new' ? 'Create file' : 'Add to file'}
             </button>
           </div>
         </footer>

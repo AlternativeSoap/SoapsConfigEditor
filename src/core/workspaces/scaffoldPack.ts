@@ -87,6 +87,34 @@ export function scaffoldPack(kind: WorkspaceKind, options: ScaffoldOptions): Fil
           packName,
           'reagents',
         ),
+        file(
+          `${base}/experience-curves.yml`,
+          `# MythicRPG experience curves for ${packName}.\n# Archetypes reference these by id (ExperienceCurve).\nSTANDARD:\n  Type: FORMULA\n  Formula: 'x * 100'\n\nSLOW:\n  Type: FORMULA\n  Formula: 'x * 150'\n`,
+          packName,
+          'other',
+        ),
+        file(
+          `${base}/experience-sources.yml`,
+          `# MythicRPG experience sources for ${packName}.\n# Archetypes reference these by id (ExperienceSource).\nCOMBAT:\n  Sources:\n  - Type: killEntity\n    Default: 1\n    Values:\n    - ZOMBIE 1to2\n    - SKELETON 1to2\n\nSPELLCASTING:\n  Sources:\n  - Type: castSpell\n    Default: 1\n\nMINING:\n  Sources:\n  - Type: blockBreak\n    Default: 1\n    Values:\n    - COAL_ORE 2\n    - IRON_ORE 4\n    - DIAMOND_ORE 10\n`,
+          packName,
+          'other',
+        ),
+      )
+    }
+    if (addons.crucible) {
+      files.push(
+        file(
+          `${base}/equipment-sets.yml`,
+          `# MythicCrucible equipment sets for ${packName}.\n# Use New → New equipment set to add one.\n`,
+          packName,
+          'equipment-sets',
+        ),
+        file(
+          `${base}/augments.yml`,
+          `# MythicCrucible augment types for ${packName}.\n# Use New → New augment type to add one.\n`,
+          packName,
+          'augments',
+        ),
       )
     }
     return files

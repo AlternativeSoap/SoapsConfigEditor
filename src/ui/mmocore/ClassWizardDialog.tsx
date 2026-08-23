@@ -20,6 +20,7 @@ import {
 import {
   upsertElementRow,
   generateAttackSkillRegistrations,
+  resolvePrimaryElementId,
 } from '../../core/mmocore/elements'
 import { mergeLoreForMode } from '../../core/mmocore/loreBuilder'
 import { CASTING_KEYBINDS, DAMAGE_TYPE_CHIPS, DEFAULT_ELEMENT_IDS } from '../../data/mmocore/triggers'
@@ -363,7 +364,7 @@ function buildOutputFileList(
 
   if (input.includeAttackSkills && input.syncElementRow) {
     const prefix = (input.attackSkillPrefix || input.id).trim().toLowerCase()
-    const elementId = input.id.toUpperCase()
+    const elementId = resolvePrimaryElementId(input)
     const elementsPath = 'MythicLib/elements.yml'
     const existingElements = files.find((f) => f.path === elementsPath)
     const nextElements = upsertElementRow(existingElements?.content ?? '', {
@@ -378,17 +379,16 @@ function buildOutputFileList(
     out.push({
       path: elementsPath,
       content: nextElements,
-      mode: existingElements ? 'create' : 'create',
+      mode: 'create',
     })
 
     const attackPath = 'MythicLib/skill/attack_skills.yml'
     const existingAtk = files.find((f) => f.path === attackPath)
-    const atkYaml = generateAttackSkillRegistrations(prefix, elementId)
-    const atkIds = [`${prefix}_regular_attack`, `${prefix}_critical_strike`]
     const existingAtkIds = new Set(
       existingAtk ? extractTopLevelIds(parseYaml(existingAtk.content).data) : [],
     )
-    if (!atkIds.every((id) => existingAtkIds.has(id))) {
+    const atkYaml = generateAttackSkillRegistrations(prefix, elementId, existingAtkIds)
+    if (atkYaml.trim()) {
       out.push({
         path: attackPath,
         content: existingAtk
@@ -557,7 +557,24 @@ export function ClassWizardDialog({
     const idx = index.classPaths.indexOf(path)
     const id = idx >= 0 ? index.classIds[idx] : pathClassId(path)
     const parsed = parseClassYaml(file.content, id)
-    setInput(parsed)
+    const skills = parsed.skills.map((s) => {
+      const ml = index.mythicLibSkills.find((m) => m.id === s.id)
+      if (!ml) return s
+      const modifiers =
+        Object.keys(s.modifiers).length > 0
+          ? s.modifiers
+          : Object.fromEntries(
+              Object.entries(ml.parameters).map(([k, v]) => [k, { ...v }]),
+            )
+      return {
+        ...s,
+        displayName: ml.name?.trim() ? ml.name : s.displayName,
+        categories: ml.categories.length > 0 ? ml.categories : s.categories,
+        icon: ml.icon || s.icon,
+        modifiers,
+      }
+    })
+    setInput({ ...parsed, skills })
     setEditingPath(path)
   }
 

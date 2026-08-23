@@ -20,19 +20,36 @@ const EMPTY_CONTEXT: SkillLineContext = {
   conditions: new Map(),
 }
 
-const mechanicById = new Map<string, MechanicEntry>()
-const mechanicByAlias = new Map<string, MechanicEntry>()
-
-for (const m of MECHANICS) {
-  mechanicById.set(m.id.toLowerCase(), m)
-  for (const alias of m.aliases) {
-    mechanicByAlias.set(alias.toLowerCase(), m)
-  }
+type MechanicIndex = {
+  byId: Map<string, MechanicEntry>
+  byAlias: Map<string, MechanicEntry>
 }
 
-export function findMechanic(token: string): MechanicEntry | undefined {
+const indexCache = new WeakMap<MechanicEntry[], MechanicIndex>()
+
+function getMechanicIndex(mechanics: MechanicEntry[]): MechanicIndex {
+  let idx = indexCache.get(mechanics)
+  if (idx) return idx
+  const byId = new Map<string, MechanicEntry>()
+  const byAlias = new Map<string, MechanicEntry>()
+  for (const m of mechanics) {
+    byId.set(m.id.toLowerCase(), m)
+    for (const alias of m.aliases) {
+      byAlias.set(alias.toLowerCase(), m)
+    }
+  }
+  idx = { byId, byAlias }
+  indexCache.set(mechanics, idx)
+  return idx
+}
+
+export function findMechanic(
+  token: string,
+  mechanics: MechanicEntry[] = MECHANICS,
+): MechanicEntry | undefined {
   const key = token.toLowerCase()
-  return mechanicById.get(key) ?? mechanicByAlias.get(key)
+  const idx = getMechanicIndex(mechanics)
+  return idx.byId.get(key) ?? idx.byAlias.get(key)
 }
 
 /** Parse semicolon-separated keys inside `{…}`. Ignores an incomplete trailing token without `=`. */
@@ -48,13 +65,16 @@ export function parseAttrNames(insideBraces: string): Set<string> {
   return names
 }
 
-export function parseSkillLineContext(lineText: string): SkillLineContext {
+export function parseSkillLineContext(
+  lineText: string,
+  mechanics: MechanicEntry[] = MECHANICS,
+): SkillLineContext {
   const parts = parseSkillLineParts(lineText)
   let mechanicId: string | null = null
   let presentAttrs: string[] = []
   if (parts.mechanic) {
     const idToken = parts.mechanic.replace(/\{.*$/, '').trim()
-    const mechanic = findMechanic(idToken)
+    const mechanic = findMechanic(idToken, mechanics)
     if (mechanic) {
       mechanicId = mechanic.id
       const brace = /\{([^}]*)\}/.exec(parts.mechanic)

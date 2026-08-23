@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
   MECHANIC_CATEGORY_LABELS,
-  MECHANICS,
   type MechanicCategory,
   type MechanicEntry,
   type MechanicAttr,
 } from '../data/mythicmobs/mechanics'
-import { CONDITION_TYPE_LABELS, CONDITIONS, toInlineConditionSnippet, type ConditionEntry, type ConditionType } from '../data/mythicmobs/conditions'
-import { TARGETER_KIND_LABELS, TARGETERS, type TargeterEntry, type TargeterKind } from '../data/mythicmobs/targeters'
-import { TRIGGERS, type TriggerEntry } from '../data/mythicmobs/triggers'
+import { CONDITION_TYPE_LABELS, toInlineConditionSnippet, type ConditionEntry, type ConditionType } from '../data/mythicmobs/conditions'
+import { TARGETER_KIND_LABELS, type TargeterEntry, type TargeterKind } from '../data/mythicmobs/targeters'
+import type { TriggerEntry } from '../data/mythicmobs/triggers'
 import {
   PRESET_CATEGORY_LABELS,
   SKILL_PRESETS,
@@ -18,6 +17,7 @@ import {
   type SkillPreset,
 } from '../data/mythicmobs/projectilePresets'
 import { attrsFromInsertSnippet, type SkillLineContext } from '../core/mythicmobs/skillLineAttrs'
+import { resolveMythicCatalogs } from '../core/mythicmobs/resolveCatalogs'
 
 type Tab = 'presets' | 'mechanics' | 'targeters' | 'triggers' | 'conditions'
 
@@ -29,6 +29,8 @@ interface ReferencePanelProps {
   onInsertTargeterAttr: (targeterId: string, attr: MechanicAttr) => void
   onInsertConditionAttr: (conditionId: string, attr: MechanicAttr) => void
   lineContext: SkillLineContext
+  /** When true, includes Crucible catalog entries. */
+  crucibleEnabled?: boolean
 }
 
 const ATTR_TYPE_COLOR: Record<string, string> = {
@@ -85,7 +87,9 @@ export function ReferencePanel({
   onInsertTargeterAttr,
   onInsertConditionAttr,
   lineContext,
+  crucibleEnabled = false,
 }: ReferencePanelProps) {
+  const catalogs = useMemo(() => resolveMythicCatalogs(crucibleEnabled), [crucibleEnabled])
   const [tab, setTab] = useState<Tab>('presets')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<MechanicCategory | 'all'>('all')
@@ -103,7 +107,7 @@ export function ReferencePanel({
   const query = search.toLowerCase().trim()
 
   const filteredMechanics = useMemo(() => {
-    return MECHANICS.filter((m) => {
+    return catalogs.mechanics.filter((m) => {
       if (categoryFilter !== 'all' && m.category !== categoryFilter) return false
       if (!query) return true
       return (
@@ -112,35 +116,35 @@ export function ReferencePanel({
         m.aliases.some((a) => a.toLowerCase().includes(query))
       )
     })
-  }, [query, categoryFilter])
+  }, [query, categoryFilter, catalogs.mechanics])
 
   const filteredTargeters = useMemo<TargeterEntry[]>(() => {
-    if (!query) return TARGETERS
-    return TARGETERS.filter(
+    if (!query) return catalogs.targeters
+    return catalogs.targeters.filter(
       (t) =>
         t.id.toLowerCase().includes(query) ||
         t.description.toLowerCase().includes(query) ||
         t.shorthand.some((s) => s.toLowerCase().includes(query)),
     )
-  }, [query])
+  }, [query, catalogs.targeters])
 
   const filteredTriggers = useMemo<TriggerEntry[]>(() => {
-    if (!query) return TRIGGERS
-    return TRIGGERS.filter(
+    if (!query) return catalogs.triggers
+    return catalogs.triggers.filter(
       (t) =>
         t.id.toLowerCase().includes(query) ||
         t.description.toLowerCase().includes(query),
     )
-  }, [query])
+  }, [query, catalogs.triggers])
 
   const filteredConditions = useMemo<ConditionEntry[]>(() => {
-    if (!query) return CONDITIONS
-    return CONDITIONS.filter(
+    if (!query) return catalogs.conditions
+    return catalogs.conditions.filter(
       (c) =>
         c.id.toLowerCase().includes(query) ||
         c.description.toLowerCase().includes(query),
     )
-  }, [query])
+  }, [query, catalogs.conditions])
 
   const filteredPresets = useMemo(() => {
     return SKILL_PRESETS.filter((p) => {

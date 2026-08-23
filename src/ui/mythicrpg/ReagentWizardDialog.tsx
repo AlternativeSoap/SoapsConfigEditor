@@ -5,6 +5,7 @@ import {
   resolvePackRoot,
   suggestReagentPath,
   suggestStatsPath,
+  yamlHasTopLevelKey,
 } from '../../core/mythicrpg/generators'
 import { REAGENT_PRESETS } from '../../data/mythicrpg/presets'
 import type { FileRecord, ReagentGeneratorInput } from '../../types'
@@ -43,21 +44,21 @@ interface ReagentWizardDialogProps {
   onApply: (output: ReagentWizardOutput) => void
 }
 
-function mergeYaml(files: FileRecord[], path: string, yaml: string, header: string): {
-  path: string
-  content: string
-  mode: 'create' | 'append'
-} {
+function mergeYaml(
+  files: FileRecord[],
+  path: string,
+  yaml: string,
+  header: string,
+): { path: string; content: string; mode: 'create' | 'append' } | { error: string } {
   const existing = files.find((f) => f.path.replace(/\\/g, '/') === path)
+  const key = yaml.split('\n')[0]?.replace(/:$/, '') ?? ''
+  if (existing && key && yamlHasTopLevelKey(existing.content, key)) {
+    return { error: `${key} already exists in ${path}. Pick another id or edit the existing entry.` }
+  }
   if (!existing) {
     return { path, content: `${header}\n${yaml}`, mode: 'create' }
   }
   const base = existing.content.trimEnd()
-  // Avoid duplicating a top-level key if the file already defines it
-  const key = yaml.split('\n')[0]?.replace(/:$/, '') ?? ''
-  if (key && new RegExp(`^${key}:`, 'm').test(existing.content)) {
-    return { path, content: existing.content, mode: 'create' }
-  }
   return { path, content: base ? `${base}\n\n${yaml}` : yaml, mode: 'create' }
 }
 
@@ -129,19 +130,24 @@ export function ReagentWizardDialog({
       }
     }
     const path = (targetPath.trim() || suggestReagentPath(packRoot)).replace(/\\/g, '/')
-    const writes = [
-      mergeYaml(files, path, yaml, `# MythicRPG reagents\n`),
-    ]
+    const reagentWrite = mergeYaml(files, path, yaml, `# MythicRPG reagents\n`)
+    if ('error' in reagentWrite) {
+      setStep(0)
+      setError(reagentWrite.error)
+      return
+    }
+    const writes = [reagentWrite]
     if (input.scaleWithMaxMana || input.writeMaxManaStat) {
       const statsPath = suggestStatsPath(packRoot)
-      writes.push(
-        mergeYaml(
-          files,
-          statsPath,
-          generateMaxManaStatYaml(input.maxManaBase || 1000),
-          `# Mythic stats\n`,
-        ),
+      const statsWrite = mergeYaml(
+        files,
+        statsPath,
+        generateMaxManaStatYaml(input.maxManaBase || 1000),
+        `# Mythic stats\n`,
       )
+      if (!('error' in statsWrite)) {
+        writes.push(statsWrite)
+      }
     }
     onApply({ files: writes })
   }

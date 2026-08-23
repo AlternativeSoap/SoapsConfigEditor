@@ -13,12 +13,12 @@ import {
 import { tags as t } from '@lezer/highlight'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { buildMythicAutocomplete } from '../core/mythicmobs/autocomplete'
-import { MECHANICS, type MechanicAttr } from '../data/mythicmobs/mechanics'
+import { resolveMythicCatalogs } from '../core/mythicmobs/resolveCatalogs'
+import type { MechanicAttr } from '../data/mythicmobs/mechanics'
 import {
   appendBraceBlock,
   attrSnippet,
   buildMechanicLine,
-  findMechanic,
   insertAttrIntoBraceBlock,
   insertAttrIntoMechanicBlock,
   isEmptySkillLine,
@@ -49,6 +49,8 @@ interface YamlEditorProps {
   acPrefs?: AcPrefs
   /** Active file category — scopes YAML key and list completions. */
   fileCategory?: MythicCategory
+  /** When true, merges Crucible mechanics/targeters/conditions/triggers into autocomplete. */
+  crucibleEnabled?: boolean
   onLineContextChange?: (context: SkillLineContext) => void
 }
 
@@ -123,7 +125,17 @@ function themeExtensions(theme: ThemeMode) {
 }
 
 export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
-  function YamlEditor({ value, theme, onChange, placeholder, packIndex, acPrefs, fileCategory, onLineContextChange }, ref) {
+  function YamlEditor({
+    value,
+    theme,
+    onChange,
+    placeholder,
+    packIndex,
+    acPrefs,
+    fileCategory,
+    crucibleEnabled = false,
+    onLineContextChange,
+  }, ref) {
     const parentRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
     const themeRef = useRef(new Compartment())
@@ -134,10 +146,13 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
     onLineContextRef.current = onLineContextChange
     const fileCategoryRef = useRef(fileCategory)
     fileCategoryRef.current = fileCategory
+    const crucibleRef = useRef(crucibleEnabled)
+    crucibleRef.current = crucibleEnabled
 
     function publishLineContext(view: EditorView) {
       const line = view.state.doc.lineAt(view.state.selection.main.from)
-      onLineContextRef.current?.(parseSkillLineContext(line.text))
+      const mechanics = resolveMythicCatalogs(crucibleRef.current).mechanics
+      onLineContextRef.current?.(parseSkillLineContext(line.text, mechanics))
     }
 
     useImperativeHandle(ref, () => ({
@@ -155,14 +170,15 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
       insertMechanicAttr(mechanicId: string, attr: MechanicAttr) {
         const view = viewRef.current
         if (!view) return
-        const mechanic = MECHANICS.find((m) => m.id === mechanicId)
+        const activeCatalogs = resolveMythicCatalogs(crucibleRef.current)
+        const mechanic = activeCatalogs.mechanics.find((m) => m.id === mechanicId)
         if (!mechanic) return
 
         const { from } = view.state.selection.main
         const line = view.state.doc.lineAt(from)
         const lineText = line.text
 
-        const ctx = parseSkillLineContext(lineText)
+        const ctx = parseSkillLineContext(lineText, activeCatalogs.mechanics)
         if (ctx.mechanicId === mechanic.id && ctx.presentAttrs.includes(attr.name.toLowerCase())) {
           return
         }
@@ -218,7 +234,7 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
         const { from } = view.state.selection.main
         const line = view.state.doc.lineAt(from)
         const lineText = line.text
-        const ctx = parseSkillLineContext(lineText)
+        const ctx = parseSkillLineContext(lineText, resolveMythicCatalogs(crucibleRef.current).mechanics)
         const existing = ctx.targeters.get(targeterId.toLowerCase()) ?? []
         if (existing.includes(attr.name.toLowerCase())) return
 
@@ -240,7 +256,7 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
         const { from } = view.state.selection.main
         const line = view.state.doc.lineAt(from)
         const lineText = line.text
-        const ctx = parseSkillLineContext(lineText)
+        const ctx = parseSkillLineContext(lineText, resolveMythicCatalogs(crucibleRef.current).mechanics)
         const existing = ctx.conditions.get(conditionId.toLowerCase()) ?? []
         if (existing.includes(attr.name.toLowerCase())) return
 
@@ -282,6 +298,9 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
                   packIndex.droptableIds,
                   acPrefs,
                   fileCategoryRef.current,
+                  crucibleRef.current,
+                  packIndex.equipmentSetIds,
+                  packIndex.augmentTypeIds,
                 )
               : [],
           ),
@@ -338,11 +357,14 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
                 packIndex.droptableIds,
                 acPrefs,
                 fileCategory,
+                crucibleEnabled,
+                packIndex.equipmentSetIds,
+                packIndex.augmentTypeIds,
               )
             : [],
         ),
       })
-    }, [packIndex, acPrefs, fileCategory])
+    }, [packIndex, acPrefs, fileCategory, crucibleEnabled])
 
     return <div className="yaml-editor" ref={parentRef} />
   },

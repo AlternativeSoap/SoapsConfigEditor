@@ -3,6 +3,7 @@ import {
   generateArchetypeYaml,
   resolvePackRoot,
   suggestArchetypePath,
+  yamlHasTopLevelKey,
 } from '../../core/mythicrpg/generators'
 import { ARCHETYPE_PRESETS } from '../../data/mythicrpg/presets'
 import type { ArchetypeGeneratorInput, FileRecord } from '../../types'
@@ -39,6 +40,7 @@ interface ArchetypeWizardDialogProps {
   files: FileRecord[]
   packName: string
   skillIds: string[]
+  existingArchetypeIds: string[]
   onClose: () => void
   onApply: (output: ArchetypeWizardOutput) => void
 }
@@ -56,6 +58,7 @@ export function ArchetypeWizardDialog({
   files,
   packName,
   skillIds,
+  existingArchetypeIds,
   onClose,
   onApply,
 }: ArchetypeWizardDialogProps) {
@@ -91,7 +94,11 @@ export function ArchetypeWizardDialog({
 
   function validateStep(current: number): string | null {
     if (current === 0) {
-      if (!input.id.trim()) return 'Archetype id is required.'
+      const id = input.id.trim()
+      if (!id) return 'Archetype id is required.'
+      if (existingArchetypeIds.some((a) => a.toLowerCase() === id.toLowerCase())) {
+        return `Archetype ${id} already exists in this pack.`
+      }
     }
     if (current === 1) {
       if (input.minLevel < 1) return 'Min level must be at least 1.'
@@ -119,8 +126,16 @@ export function ArchetypeWizardDialog({
         return
       }
     }
-    const path = targetPath.trim() || suggestArchetypePath(packRoot)
-    onApply({ files: [mergeYaml(files, path.replace(/\\/g, '/'), yaml)] })
+    const path = (targetPath.trim() || suggestArchetypePath(packRoot)).replace(/\\/g, '/')
+    const existing = files.find((f) => f.path.replace(/\\/g, '/') === path)
+    if (existing && yamlHasTopLevelKey(existing.content, input.id.trim())) {
+      setStep(0)
+      setError(
+        `Archetype ${input.id.trim()} already exists in ${path}. Pick another id or edit the existing entry.`,
+      )
+      return
+    }
+    onApply({ files: [mergeYaml(files, path, yaml)] })
   }
 
   return (
@@ -301,7 +316,7 @@ export function ArchetypeWizardDialog({
               </label>
               {skillIds.length > 0 ? (
                 <p className="create-section-hint">
-                  Skills in this pack: {skillIds.slice(0, 12).join(', ')}
+                Spell / skill ids in this pack: {skillIds.slice(0, 12).join(', ')}
                   {skillIds.length > 12 ? '…' : ''}
                 </p>
               ) : null}
