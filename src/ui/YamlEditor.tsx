@@ -12,7 +12,7 @@ import {
 } from '@codemirror/view'
 import { tags as t } from '@lezer/highlight'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import { buildMythicAutocomplete } from '../core/mythicmobs/autocomplete'
+import { buildMythicAutocomplete, buildYamlStructureAutocomplete } from '../core/mythicmobs/autocomplete'
 import {
   buildSoapsQuestAutocomplete,
   type SoapsQuestCatalog,
@@ -163,6 +163,31 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
     filePathRef.current = filePath
     const crucibleRef = useRef(crucibleEnabled)
     crucibleRef.current = crucibleEnabled
+
+    function autocompleteExtensions() {
+      if (packIndex && acPrefs?.enabled !== false) {
+        return buildMythicAutocomplete(
+          packIndex.mobIds,
+          packIndex.itemIds,
+          packIndex.skillIds,
+          packIndex.droptableIds,
+          acPrefs,
+          fileCategoryRef.current,
+          crucibleRef.current,
+          packIndex.equipmentSetIds,
+          packIndex.augmentTypeIds,
+          filePathRef.current,
+        )
+      }
+      if (fileCategoryRef.current) {
+        return buildYamlStructureAutocomplete(
+          fileCategoryRef.current,
+          filePathRef.current,
+          crucibleRef.current,
+        )
+      }
+      return []
+    }
 
     function publishLineContext(view: EditorView) {
       const line = view.state.doc.lineAt(view.state.selection.main.from)
@@ -321,22 +346,7 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           placeholderExt(placeholder ?? ''),
           themeRef.current.of(themeExtensions(theme)),
-          acRef.current.of(
-            packIndex && acPrefs?.enabled !== false
-              ? buildMythicAutocomplete(
-                  packIndex.mobIds,
-                  packIndex.itemIds,
-                  packIndex.skillIds,
-                  packIndex.droptableIds,
-                  acPrefs,
-                  fileCategoryRef.current,
-                  crucibleRef.current,
-                  packIndex.equipmentSetIds,
-                  packIndex.augmentTypeIds,
-                  filePathRef.current,
-                )
-              : [],
-          ),
+          acRef.current.of(autocompleteExtensions()),
           sqAcRef.current.of(
             soapsQuestCatalog ? buildSoapsQuestAutocomplete(soapsQuestCatalog) : [],
           ),
@@ -384,22 +394,7 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
       const view = viewRef.current
       if (!view) return
       view.dispatch({
-        effects: acRef.current.reconfigure(
-          packIndex && acPrefs?.enabled !== false
-            ? buildMythicAutocomplete(
-                packIndex.mobIds,
-                packIndex.itemIds,
-                packIndex.skillIds,
-                packIndex.droptableIds,
-                acPrefs,
-                fileCategory,
-                crucibleEnabled,
-                packIndex.equipmentSetIds,
-                packIndex.augmentTypeIds,
-                filePath,
-              )
-            : [],
-        ),
+        effects: acRef.current.reconfigure(autocompleteExtensions()),
       })
     }, [packIndex, acPrefs, fileCategory, crucibleEnabled, filePath])
 

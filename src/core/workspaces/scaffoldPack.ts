@@ -104,13 +104,13 @@ export function scaffoldPack(kind: WorkspaceKind, options: ScaffoldOptions): Fil
           `${base}/experience-curves.yml`,
           `# MythicRPG experience curves for ${packName}.\n# Archetypes reference these by id (ExperienceCurve).\nSTANDARD:\n  Type: FORMULA\n  Formula: 'x * 100'\n\nSLOW:\n  Type: FORMULA\n  Formula: 'x * 150'\n`,
           packName,
-          'other',
+          'experience-curves',
         ),
         file(
           `${base}/experience-sources.yml`,
           `# MythicRPG experience sources for ${packName}.\n# Archetypes reference these by id (ExperienceSource).\nCOMBAT:\n  Sources:\n  - Type: killEntity\n    Default: 1\n    Values:\n    - ZOMBIE 1to2\n    - SKELETON 1to2\n\nSPELLCASTING:\n  Sources:\n  - Type: castSpell\n    Default: 1\n\nMINING:\n  Sources:\n  - Type: blockBreak\n    Default: 1\n    Values:\n    - COAL_ORE 2\n    - IRON_ORE 4\n    - DIAMOND_ORE 10\n`,
           packName,
-          'other',
+          'experience-sources',
         ),
       )
     }

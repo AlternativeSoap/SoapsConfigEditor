@@ -1851,7 +1851,9 @@ function App() {
             placeholder="Select a file from the list."
             packIndex={isMythicMobs ? packIndex : undefined}
             acPrefs={isMythicMobs ? acPrefs : undefined}
-            fileCategory={isMythicMobs ? activeFile?.category : undefined}
+            fileCategory={
+              isMythicMobs || isMMOCore || isSoapsQuest ? activeFile?.category : undefined
+            }
             filePath={activeFile?.path}
             crucibleEnabled={crucibleEnabled}
             soapsQuestCatalog={soapsQuestCatalog}

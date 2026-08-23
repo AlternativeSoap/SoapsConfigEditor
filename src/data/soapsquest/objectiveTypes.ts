@@ -34,7 +34,11 @@ export interface ObjectiveTypeInfo {
   amountHint?: string
 }
 
-export const OBJECTIVE_GROUPS: { id: string; label: string; types: ObjectiveTypeInfo[] }[] = [
+export const OBJECTIVE_GROUPS: {
+  id: string
+  label: string
+  types: Omit<ObjectiveTypeInfo, 'group'>[]
+}[] = [
   {
     id: 'combat',
     label: 'Combat',
@@ -164,7 +168,9 @@ export const OBJECTIVE_GROUPS: { id: string; label: string; types: ObjectiveType
   },
 ]
 
-export const ALL_OBJECTIVE_TYPES: ObjectiveTypeInfo[] = OBJECTIVE_GROUPS.flatMap((g) => g.types)
+export const ALL_OBJECTIVE_TYPES: ObjectiveTypeInfo[] = OBJECTIVE_GROUPS.flatMap((g) =>
+  g.types.map((t) => ({ ...t, group: g.id })),
+)
 
 export function objectiveTypeInfo(id: string): ObjectiveTypeInfo | undefined {
   return ALL_OBJECTIVE_TYPES.find((t) => t.id === id)

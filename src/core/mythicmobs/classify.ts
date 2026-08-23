@@ -24,7 +24,13 @@ export function classifyMythicCategory(filePath: string): MythicCategory {
     return 'augments'
   }
   if (baseName === 'stats.yml' || baseName.endsWith('.stat.yml')) {
-    return 'other'
+    return 'stats'
+  }
+  if (baseName === 'experience-curves.yml' || baseName.startsWith('experience-curves.')) {
+    return 'experience-curves'
+  }
+  if (baseName === 'experience-sources.yml' || baseName.startsWith('experience-sources.')) {
+    return 'experience-sources'
   }
   if (baseName === 'packinfo.yml' || baseName.startsWith('packinfo.')) {
     return 'packinfo'

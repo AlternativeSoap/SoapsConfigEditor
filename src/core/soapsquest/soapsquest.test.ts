@@ -34,7 +34,8 @@ describe('classifySoapsQuestCategory', () => {
   it('maps quests.yml to quests', () => {
     expect(classifySoapsQuestCategory('quests.yml')).toBe('quests')
     expect(classifySoapsQuestCategory('plugins/SoapsQuest/quests.yml')).toBe('quests')
-    expect(classifySoapsQuestCategory('tiers.yml')).toBe('other')
+    expect(classifySoapsQuestCategory('tiers.yml')).toBe('tiers')
+    expect(classifySoapsQuestCategory('difficulties.yml')).toBe('difficulties')
   })
 })
 

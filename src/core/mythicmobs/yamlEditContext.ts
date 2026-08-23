@@ -1,5 +1,26 @@
 import type { Text } from '@codemirror/state'
 import type { MythicCategory } from '../../types'
+import {
+  bodyKeyDefsForCategory,
+  bodyKeyIndentForCategory,
+  DROPTABLE_BODY_DEFS,
+  ITEM_BODY_DEFS,
+  MOB_BODY_DEFS,
+  RANDOMSPAWN_BODY_DEFS,
+  SKILL_BODY_DEFS,
+} from '../yaml/bodyKeyCatalogs'
+import { defsToKeys } from '../yaml/bodyKeyDefs'
+
+export type { BodyKeyDef } from '../yaml/bodyKeyDefs'
+export {
+  bodyKeyDefsForCategory,
+  bodyKeyIndentForCategory,
+  MOB_BODY_DEFS,
+  SKILL_BODY_DEFS,
+  ITEM_BODY_DEFS,
+  DROPTABLE_BODY_DEFS,
+  RANDOMSPAWN_BODY_DEFS,
+} from '../yaml/bodyKeyCatalogs'
 
 export type YamlListParent =
   | 'Skills'
@@ -10,6 +31,12 @@ export type YamlListParent =
   | 'AITargetSelectors'
   | 'Options'
   | 'Exclude'
+  | 'DamageModifiers'
+  | 'KillMessages'
+  | 'Description'
+  | 'BaseStats'
+  | 'StatModifiers'
+  | 'SpellUnlocks'
   | null
 
 export interface YamlEditContext {
@@ -31,6 +58,12 @@ const PARENT_KEY_ALIASES: Record<string, YamlListParent> = {
   aitargetselectors: 'AITargetSelectors',
   options: 'Options',
   exclude: 'Exclude',
+  damagemodifiers: 'DamageModifiers',
+  killmessages: 'KillMessages',
+  description: 'Description',
+  basestats: 'BaseStats',
+  statmodifiers: 'StatModifiers',
+  spellunlocks: 'SpellUnlocks',
 }
 
 /** Normalize YAML parent keys to canonical MythicMobs casing (skills → Skills). */
@@ -68,37 +101,67 @@ export function detectYamlEditContext(doc: Text, lineNumber: number, fileCategor
   return { parentKey, lineIndent, fileCategory }
 }
 
-export const MOB_BODY_KEYS = [
-  'Type', 'Display', 'Health', 'Damage', 'Armor', 'Faction', 'Template', 'Exclude', 'Skills', 'Drops', 'Equipment', 'Options',
-  'AIGoalSelectors', 'AITargetSelectors', 'Modules', 'Level', 'KillMessages',
-  'Disguise', 'BossBar', 'ThreatTable', 'DamageModifiers', 'ImmunityTables',
-]
+/** @deprecated Prefer MOB_BODY_DEFS */
+export const MOB_BODY_KEYS = defsToKeys(MOB_BODY_DEFS)
 
-export const SKILL_BODY_KEYS = ['Skills', 'Conditions', 'Cooldown', 'Options', 'OnCooldownSkill']
+/** @deprecated Prefer SKILL_BODY_DEFS */
+export const SKILL_BODY_KEYS = defsToKeys(SKILL_BODY_DEFS)
 
-export const ITEM_BODY_KEYS = ['Id', 'Display', 'Options', 'Lore', 'NBT', 'Skills', 'Enchantments', 'Model']
+/** @deprecated Prefer ITEM_BODY_DEFS */
+export const ITEM_BODY_KEYS = defsToKeys(ITEM_BODY_DEFS)
 
-export const DROPTABLE_BODY_KEYS = ['Drops', 'Conditions', 'TotalItems', 'MinItems', 'MaxItems']
+/** @deprecated Prefer DROPTABLE_BODY_DEFS */
+export const DROPTABLE_BODY_KEYS = defsToKeys(DROPTABLE_BODY_DEFS)
 
-export const RANDOMSPAWN_BODY_KEYS = ['Action', 'Type', 'Level', 'Chance', 'Worlds', 'Biomes', 'Conditions', 'Priority']
+/** @deprecated Prefer RANDOMSPAWN_BODY_DEFS */
+export const RANDOMSPAWN_BODY_KEYS = defsToKeys(RANDOMSPAWN_BODY_DEFS)
 
 export const EQUIPMENT_SLOTS = ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HAND', 'OFFHAND']
 
-export const DROP_BUILTINS = ['exp', 'money', 'command', 'nothing', 'mcmmo-exp']
+export const DROP_BUILTINS = ['exp', 'money', 'command', 'nothing', 'mcmmo-exp'] as const
+
+export const DROP_BUILTIN_APPLY: Record<(typeof DROP_BUILTINS)[number], string> = {
+  exp: 'exp 5',
+  money: 'money 10',
+  command: 'command{c="say hi"}',
+  nothing: 'nothing',
+  'mcmmo-exp': 'mcmmo-exp 10',
+}
 
 export function bodyKeysForCategory(category?: MythicCategory): string[] {
-  switch (category) {
-    case 'mobs':
-      return MOB_BODY_KEYS
-    case 'skills':
-      return SKILL_BODY_KEYS
-    case 'items':
-      return ITEM_BODY_KEYS
-    case 'droptables':
-      return DROPTABLE_BODY_KEYS
-    case 'randomspawns':
-      return RANDOMSPAWN_BODY_KEYS
-    default:
-      return []
+  return defsToKeys(bodyKeyDefsForCategory(category))
+}
+
+/** Collect sibling body keys at a given indent under the same entity block. */
+export function collectSiblingBodyKeys(
+  doc: { line: (n: number) => { text: string }; lines: number },
+  lineNumber: number,
+  indent: number,
+): Set<string> {
+  const present = new Set<string>()
+  for (let i = 1; i <= doc.lines; i++) {
+    if (i === lineNumber) continue
+    const text = doc.line(i).text
+    const ind = leadingIndent(text)
+    if (ind !== indent) continue
+    const m = /^\s*([A-Za-z][A-Za-z0-9_-]*):/.exec(text)
+    if (m?.[1]) present.add(m[1])
   }
+  return present
+}
+
+/** Nearest YAML key ancestor with less indent than the current line. */
+export function findNearestYamlParentKey(
+  doc: { line: (n: number) => { text: string } },
+  lineNumber: number,
+  lineIndent: number,
+): string | null {
+  for (let i = lineNumber - 1; i >= 1; i--) {
+    const text = doc.line(i).text
+    const ind = leadingIndent(text)
+    if (ind >= lineIndent) continue
+    const keyMatch = /^\s*([A-Za-z][A-Za-z0-9_-]*):\s*(.*)?$/.exec(text)
+    if (keyMatch?.[1]) return keyMatch[1]
+  }
+  return null
 }

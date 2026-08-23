@@ -8,6 +8,12 @@ export function classifySoapsQuestCategory(path: string): MythicCategory {
   if (base === 'quests.yml' || base.endsWith('/quests.yml')) {
     return 'quests'
   }
+  if (base === 'tiers.yml' || base.endsWith('/tiers.yml')) {
+    return 'tiers'
+  }
+  if (base === 'difficulties.yml' || base.endsWith('/difficulties.yml')) {
+    return 'difficulties'
+  }
   return 'other'
 }
 

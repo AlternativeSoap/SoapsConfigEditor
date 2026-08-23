@@ -16,6 +16,12 @@ export const CATEGORY_LABEL: Record<MythicCategory, string> = {
   'equipment-sets': 'Equipment sets',
   augments: 'Augments',
   packinfo: 'Pack info',
+  stats: 'Stats',
+  'experience-curves': 'Experience curves',
+  'experience-sources': 'Experience sources',
+  tiers: 'Tiers',
+  difficulties: 'Difficulties',
+  elements: 'Elements',
   other: 'Other',
 }
 

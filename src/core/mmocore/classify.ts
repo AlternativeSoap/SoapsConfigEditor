@@ -27,6 +27,10 @@ export function classifyMMOCoreCategory(path: string): MythicCategory {
   if (p.includes('/droptables/') || p.includes('/drop-tables/')) return 'droptables'
   if (p.includes('/randomspawns/') || p.includes('/random-spawns/')) return 'randomspawns'
   if (p.includes('/menus/')) return 'menus'
+  const base = p.split('/').pop() ?? p
+  if (base === 'elements.yml' || base.endsWith('/elements.yml')) {
+    return 'elements'
+  }
   return 'other'
 }
 

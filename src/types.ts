@@ -40,6 +40,12 @@ export type MythicCategory =
   | 'equipment-sets'
   | 'augments'
   | 'packinfo'
+  | 'stats'
+  | 'experience-curves'
+  | 'experience-sources'
+  | 'tiers'
+  | 'difficulties'
+  | 'elements'
   | 'other'
 
 export type SessionMode = 'opened' | 'new-pack'

@@ -25,6 +25,15 @@ import type {
   SkillGeneratorInput,
 } from '../types'
 import { ColorTextField } from './ColorTextField'
+import {
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPreviewBlock,
+  DialogShell,
+} from './DialogShell'
+import { RemoveButton } from './RemoveButton'
 import { SkillLineBuilder } from './SkillLineBuilder'
 import { Switch } from './Switch'
 import {
@@ -53,6 +62,7 @@ type MythicCreateKind = Exclude<
   | 'archetype'
   | 'reagent'
   | 'quest'
+  | 'edit-quest'
   | 'equipment-set'
   | 'augment-type'
   | 'crucible-item'
@@ -144,17 +154,6 @@ function emptyDrop(): DropEntry {
   return { type: 'item', value: '', chance: 1, minAmount: 1, maxAmount: 1 }
 }
 
-function IdList({ ids }: { ids: string[] }) {
-  if (ids.length === 0) return null
-  return (
-    <datalist id="id-list">
-      {ids.map((id) => (
-        <option key={id} value={id} />
-      ))}
-    </datalist>
-  )
-}
-
 export function CreateDialog({
   kind,
   files,
@@ -175,6 +174,7 @@ export function CreateDialog({
   const [targetPath, setTargetPath] = useState(initialExisting)
   const [mob, setMob] = useState(emptyMob)
   const [optionSearch, setOptionSearch] = useState('')
+  const [showAllOptions, setShowAllOptions] = useState(false)
   const [item, setItem] = useState(emptyItem)
   const [skill, setSkill] = useState(emptySkill)
   const [droptable, setDroptable] = useState(emptyDroptable)
@@ -195,6 +195,24 @@ export function CreateDialog({
     if (kind === 'droptable') return generateDroptableYaml(droptable)
     return generateRandomSpawnYaml(spawn)
   }, [kind, mob, item, skill, droptable, spawn])
+
+  const availableMobOptions = useMemo(() => {
+    const q = optionSearch.trim().toLowerCase()
+    return MOB_OPTIONS.filter((opt) => {
+      if (Object.prototype.hasOwnProperty.call(mob.options, opt.name)) return false
+      if (!q) return true
+      return (
+        opt.name.toLowerCase().includes(q) ||
+        opt.description.toLowerCase().includes(q)
+      )
+    })
+  }, [mob.options, optionSearch])
+
+  const showOptionResults = showAllOptions || optionSearch.trim().length > 0
+  const displayedMobOptions =
+    showAllOptions && !optionSearch.trim()
+      ? availableMobOptions
+      : availableMobOptions.slice(0, 12)
 
   const createFolder = useMemo(
     () => resolveCreateFolder(category, files, suggestedPath || initialExisting),
@@ -299,7 +317,6 @@ export function CreateDialog({
 
         {kind === 'mob' && (
           <DialogBody className="dialog-create-body">
-            <IdList ids={[]} />
             <DialogPanel title="Identity">
               <div className="dialog-fields">
                 <label>
@@ -412,28 +429,36 @@ export function CreateDialog({
             
             <DialogPanel title="Options">
               <p className="dialog-note">
-                Add Options from the MythicMobs list. Only options you set are written.
+                Search or show all available options. Only options you set are written.
               </p>
               <div className="mob-option-picker">
-                <input
-                  type="search"
-                  value={optionSearch}
-                  onChange={(e) => setOptionSearch(e.target.value)}
-                  placeholder="Search options…"
-                  aria-label="Search mob options"
-                />
-                {optionSearch.trim() && (
+                <div className="mob-option-search-row">
+                  <input
+                    type="search"
+                    value={optionSearch}
+                    onChange={(e) => setOptionSearch(e.target.value)}
+                    placeholder="Search options…"
+                    aria-label="Search mob options"
+                  />
+                  <button
+                    type="button"
+                    className={`mob-option-show-all${showAllOptions ? ' active' : ''}`}
+                    onClick={() => setShowAllOptions((open) => !open)}
+                    aria-pressed={showAllOptions}
+                  >
+                    {showAllOptions ? 'Hide list' : 'Show all'}
+                  </button>
+                </div>
+                {showOptionResults && (
                   <ul className="mob-option-results">
-                    {MOB_OPTIONS.filter((opt) => {
-                      if (Object.prototype.hasOwnProperty.call(mob.options, opt.name)) return false
-                      const q = optionSearch.trim().toLowerCase()
-                      return (
-                        opt.name.toLowerCase().includes(q) ||
-                        opt.description.toLowerCase().includes(q)
-                      )
-                    })
-                      .slice(0, 12)
-                      .map((opt) => (
+                    {displayedMobOptions.length === 0 ? (
+                      <li className="mob-option-empty">
+                        {optionSearch.trim()
+                          ? 'No matching options.'
+                          : 'All listed options are already added.'}
+                      </li>
+                    ) : (
+                      displayedMobOptions.map((opt) => (
                         <li key={opt.name}>
                           <button
                             type="button"
@@ -452,7 +477,8 @@ export function CreateDialog({
                             <span className="mob-option-desc">{opt.description}</span>
                           </button>
                         </li>
-                      ))}
+                      ))
+                    )}
                   </ul>
                 )}
               </div>
@@ -501,17 +527,14 @@ export function CreateDialog({
                           aria-label={name}
                         />
                       )}
-                      <button
-                        type="button"
-                        className="mob-option-remove"
+                      <RemoveButton
+                        aria-label={`Remove ${name}`}
                         onClick={() => {
                           const next = { ...mob.options }
                           delete next[name]
                           setMob({ ...mob, options: next })
                         }}
-                      >
-                        Remove
-                      </button>
+                      />
                     </div>
                   )
                 })}
@@ -758,9 +781,7 @@ export function CreateDialog({
                       aria-label="Chance"
                       title="Chance (0–1)"
                     />
-                    <button type="button" className="drop-remove" onClick={() => removeDrop(i)} aria-label="Remove drop">
-                      ×
-                    </button>
+                    <RemoveButton aria-label="Remove drop" onClick={() => removeDrop(i)} />
                   </div>
                 ))}
                 <button
