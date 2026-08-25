@@ -10,6 +10,7 @@ import {
   lineNumbers,
   placeholder as placeholderExt,
 } from '@codemirror/view'
+import { startCompletion } from '@codemirror/autocomplete'
 import { tags as t } from '@lezer/highlight'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { buildMythicAutocomplete, buildYamlStructureAutocomplete } from '../core/mythicmobs/autocomplete'
@@ -29,6 +30,7 @@ import {
   parseSkillLineContext,
   type SkillLineContext,
 } from '../core/mythicmobs/skillLineAttrs'
+import { isCompletedYamlKeyLine, nextLineIndentSpaces } from '../core/yaml/guidedEnter'
 import type { AcPrefs, MythicCategory, PackIndex, ThemeMode } from '../types'
 
 export type { SkillLineContext }
@@ -189,6 +191,34 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
       return []
     }
 
+    /** Enter after a completed key: indent next line and open unused-key suggestions. */
+    function guidedEnterKeymap() {
+      return keymap.of([
+        {
+          key: 'Enter',
+          run: (view) => {
+            if (!fileCategoryRef.current && !packIndex) return false
+            const { state } = view
+            const sel = state.selection.main
+            if (!sel.empty) return false
+            const pos = sel.head
+            const line = state.doc.lineAt(pos)
+            if (pos < line.to && line.text.slice(pos).trim() !== '') return false
+            if (!isCompletedYamlKeyLine(line.text)) return false
+            const indent = nextLineIndentSpaces(line.text, fileCategoryRef.current)
+            const insert = `\n${indent}`
+            view.dispatch({
+              changes: { from: pos, insert },
+              selection: { anchor: pos + insert.length },
+              userEvent: 'input',
+            })
+            startCompletion(view)
+            return true
+          },
+        },
+      ])
+    }
+
     function publishLineContext(view: EditorView) {
       const line = view.state.doc.lineAt(view.state.selection.main.from)
       const mechanics = resolveMythicCatalogs(crucibleRef.current).mechanics
@@ -343,6 +373,7 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
           yaml(),
           indentUnit.of('  '),
           EditorState.tabSize.of(2),
+          guidedEnterKeymap(),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           placeholderExt(placeholder ?? ''),
           themeRef.current.of(themeExtensions(theme)),

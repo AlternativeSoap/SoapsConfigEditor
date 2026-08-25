@@ -4,6 +4,7 @@ import {
   type BodyKeyDef,
   listKey,
   mapKey,
+  quotedKey,
   scalarKey,
 } from './bodyKeyDefs'
 
@@ -14,8 +15,8 @@ function listDashKey(key: string, detail?: string, starter = ''): BodyKeyDef {
 }
 
 export const MOB_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('Type', 'Entity type'),
-  scalarKey('Display', 'Name tag'),
+  scalarKey('Type', 'Entity type (optional for vanilla overrides)'),
+  quotedKey('Display', 'Name tag'),
   scalarKey('Health', 'Max health'),
   scalarKey('Damage', 'Attack damage'),
   scalarKey('Armor', 'Armor value'),
@@ -24,14 +25,18 @@ export const MOB_BODY_DEFS: BodyKeyDef[] = [
   listDashKey('Exclude', 'Keys to exclude from template'),
   listDashKey('Skills', 'Skill lines'),
   listDashKey('Drops', 'Drop table entries'),
+  mapKey('DropOptions', 'FancyDrops and drop behavior', 4),
   mapKey('Equipment', 'Slot to item id', 4),
   mapKey('Options', 'Mob options', 4),
+  mapKey('DisplayOptions', 'Display entity options', 4),
+  mapKey('MannequinOptions', 'Mannequin entity options', 4),
   listDashKey('AIGoalSelectors', 'AI goals'),
   listDashKey('AITargetSelectors', 'AI targets'),
   mapKey('Modules', 'Module toggles', 4),
-  scalarKey('Level', 'Mob level'),
+  scalarKey('Level', 'Default level or minTOmax'),
+  mapKey('LevelModifiers', 'Per-level stat bonuses', 4),
   listDashKey('KillMessages', 'Death message lines'),
-  mapKey('Disguise', 'Disguise config', 4),
+  scalarKey('Disguise', 'LibsDisguises inline string'),
   mapKey('BossBar', 'Boss bar config', 4),
   mapKey('ThreatTable', 'Threat table config', 4),
   listDashKey('DamageModifiers', 'Damage type multipliers', 'FIRE 1'),
@@ -48,7 +53,7 @@ export const SKILL_BODY_DEFS: BodyKeyDef[] = [
 
 /** MythicRPG spell keys (same skills/ folder as metaskills). */
 export const SPELL_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('Display', 'Spell display name'),
+  quotedKey('Display', 'Spell display name'),
   listDashKey('Description', 'Description lines', '"Short description"'),
   mapKey('Icon', 'Spell icon', 4),
   boolKey('Spell', true, 'Mark as MythicRPG spell'),
@@ -67,7 +72,7 @@ export const SPELL_BODY_DEFS: BodyKeyDef[] = [
 export const MYTHICLIB_SKILL_BODY_DEFS: BodyKeyDef[] = [
   mapKey('parameters', 'Skill parameters', 4),
   listDashKey('categories', 'Skill categories'),
-  scalarKey('name', 'Skill display name'),
+  quotedKey('name', 'Skill display name'),
   listDashKey('lore', 'Skill lore lines'),
   mapKey('icon', 'Icon material', 4),
   scalarKey('source', 'MythicMobs skill source id'),
@@ -76,7 +81,7 @@ export const MYTHICLIB_SKILL_BODY_DEFS: BodyKeyDef[] = [
 
 export const ITEM_BODY_DEFS: BodyKeyDef[] = [
   scalarKey('Id', 'Material id'),
-  scalarKey('Display', 'Item name'),
+  quotedKey('Display', 'Item name'),
   mapKey('Options', 'Item options', 4),
   listDashKey('Lore', 'Lore lines'),
   mapKey('NBT', 'NBT data'),
@@ -94,19 +99,25 @@ export const DROPTABLE_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const RANDOMSPAWN_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('Action', 'Spawn action'),
+  scalarKey('Action', 'ADD, REPLACE, or DENY'),
   scalarKey('Type', 'Mob or entity type'),
+  listDashKey('Types', 'Weighted mob types', 'RegularZombie 100'),
   scalarKey('Level', 'Mob level'),
   scalarKey('Chance', 'Spawn chance'),
+  scalarKey('Priority', 'Higher wins when several match'),
+  boolKey('UseWorldScaling', true, 'Apply world scaling to level'),
   listDashKey('Worlds', 'World names'),
   listDashKey('Biomes', 'Biome names'),
   listDashKey('Conditions', 'Spawn conditions'),
-  scalarKey('Priority', 'Spawn priority'),
+  listDashKey('Reason', 'Spawn reason filter', 'NATURAL'),
+  scalarKey('PositionType', 'LAND or SEA (Action ADD)'),
+  scalarKey('Cooldown', 'Seconds between spawns'),
+  listDashKey('Structures', 'Structure ids', 'minecraft:fortress'),
 ]
 
 export const ARCHETYPE_BODY_DEFS: BodyKeyDef[] = [
   scalarKey('Group', 'Archetype group'),
-  scalarKey('Display', 'Display name'),
+  quotedKey('Display', 'Display name'),
   listDashKey('Description', 'Description lines', '"Short description"'),
   mapKey('Icon', 'Icon block', 4),
   mapKey('Leveling', 'Level settings', 4),
@@ -116,7 +127,7 @@ export const ARCHETYPE_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const REAGENT_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('Display', 'Display name'),
+  quotedKey('Display', 'Display name'),
   scalarKey('MinValue', 'Minimum value'),
   scalarKey('MaxValue', 'Maximum value'),
   boolKey('Global', false, 'Shared reagent'),
@@ -125,28 +136,28 @@ export const REAGENT_BODY_DEFS: BodyKeyDef[] = [
 
 export const EQUIPMENT_SET_BODY_DEFS: BodyKeyDef[] = [
   boolKey('Enabled', true, 'Set enabled'),
-  scalarKey('Display', 'Display name'),
+  quotedKey('Display', 'Display name'),
   listKey('Lore', 'Lore lines'),
   mapKey('Bonuses', 'Set bonuses', 4),
 ]
 
 export const AUGMENT_BODY_DEFS: BodyKeyDef[] = [
   boolKey('Enabled', true, 'Type enabled'),
-  scalarKey('Display', 'Display name'),
+  quotedKey('Display', 'Display name'),
   mapKey('Formatting', 'Slot formatting', 4),
   mapKey('Icons', 'Socket icons', 4),
 ]
 
 export const STAT_BODY_DEFS: BodyKeyDef[] = [
   boolKey('Enabled', true, 'Stat enabled'),
-  scalarKey('Display', 'Display name'),
+  quotedKey('Display', 'Display name'),
   scalarKey('BaseValue', 'Base value'),
   mapKey('Formatting', 'Format strings', 4),
 ]
 
 export const EXPERIENCE_CURVE_BODY_DEFS: BodyKeyDef[] = [
   scalarKey('Type', 'Curve type (FORMULA)'),
-  scalarKey('Formula', 'Level formula'),
+  quotedKey('Formula', 'Level formula'),
 ]
 
 export const EXPERIENCE_SOURCE_BODY_DEFS: BodyKeyDef[] = [
@@ -154,7 +165,7 @@ export const EXPERIENCE_SOURCE_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const QUEST_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('display', 'Quest name'),
+  quotedKey('display', 'Quest name'),
   scalarKey('material', 'GUI material'),
   scalarKey('tier', 'Tier id'),
   scalarKey('difficulty', 'Difficulty id'),
@@ -166,18 +177,18 @@ export const QUEST_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const TIER_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('display', 'Tier display name'),
-  scalarKey('prefix', 'Chat prefix'),
+  quotedKey('display', 'Tier display name'),
+  quotedKey('prefix', 'Chat prefix'),
   scalarKey('color', 'Color code'),
   scalarKey('weight', 'Sort weight'),
-  scalarKey('description', 'Description'),
+  quotedKey('description', 'Description'),
 ]
 
 export const DIFFICULTY_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('display', 'Difficulty display name'),
+  quotedKey('display', 'Difficulty display name'),
   scalarKey('color', 'Color code'),
   scalarKey('weight', 'Sort weight'),
-  scalarKey('description', 'Description'),
+  quotedKey('description', 'Description'),
   mapKey('multiplier', 'Amount multipliers', 6),
 ]
 
@@ -199,7 +210,7 @@ export const CLASS_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const ELEMENT_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('name', 'Element name'),
+  quotedKey('name', 'Element name'),
   scalarKey('icon', 'Icon material'),
   scalarKey('lore-icon', 'Lore icon'),
   scalarKey('color', 'Color code'),

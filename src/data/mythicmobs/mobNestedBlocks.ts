@@ -1,11 +1,18 @@
 import type { BodyKeyDef } from '../../core/yaml/bodyKeyDefs'
-import { boolKey, listKey, mapKey, scalarKey } from '../../core/yaml/bodyKeyDefs'
+import { boolKey, listKey, mapKey, quotedKey, scalarKey } from '../../core/yaml/bodyKeyDefs'
 import { ALL_OBJECTIVE_TYPES } from '../soapsquest/objectiveTypes'
 import { DAMAGE_MODIFIER_TYPES, damageModifierApply } from './damageTypes'
 import {
   BOSS_BAR_COLORS,
   BOSS_BAR_STYLES,
+  DISPLAY_ALIGNMENTS,
+  DISPLAY_BILLBOARDS,
+  DISPLAY_TRANSFORMS,
+  DROP_METHODS,
   EXPERIENCE_SOURCE_TYPES,
+  MANNEQUIN_MAIN_HANDS,
+  MANNEQUIN_MODELS,
+  MANNEQUIN_POSE_STARTERS,
 } from './nestedEnums'
 
 export type NestedBlockKind = 'list-dash' | 'map'
@@ -36,7 +43,7 @@ function mapBlock(parentKey: string, entries: BodyKeyDef[], childIndent = 4): Ne
 
 export const BOSS_BAR_DEFS: BodyKeyDef[] = [
   boolKey('Enabled', true, 'Show boss bar'),
-  scalarKey('Title', "Bar title (use '[name]')"),
+  quotedKey('Title', "Bar title (use '[name]')"),
   scalarKey('Range', 'Display range in blocks'),
   scalarKey('Color', `One of: ${BOSS_BAR_COLORS.join(', ')}`),
   scalarKey('Style', `One of: ${BOSS_BAR_STYLES.join(', ')}`),
@@ -50,12 +57,13 @@ export const MODULES_DEFS: BodyKeyDef[] = [
   boolKey('ThreatTable', true, 'Threat table module'),
 ]
 
+/** @deprecated Prefer inline Disguise: string (LibsDisguises). Kept for legacy nested YAML. */
 export const DISGUISE_DEFS: BodyKeyDef[] = [
   scalarKey('Type', 'player, mob, misc, etc.'),
-  scalarKey('Skin', 'Player skin name'),
-  scalarKey('Player', 'Player name to copy'),
+  quotedKey('Skin', 'Player skin name'),
+  quotedKey('Player', 'Player name to copy'),
   scalarKey('Mob', 'Entity type for mob disguise'),
-  scalarKey('Name', 'Display name override'),
+  quotedKey('Name', 'Display name override'),
   boolKey('Invisible', false, 'Hide entity model'),
 ]
 
@@ -63,6 +71,81 @@ export const THREAT_TABLE_DEFS: BodyKeyDef[] = [
   boolKey('Enabled', true, 'Enable threat table'),
   scalarKey('Decays', 'Threat decay rate'),
   scalarKey('OverThreat', 'Over-threat multiplier'),
+]
+
+export const DISPLAY_OPTIONS_DEFS: BodyKeyDef[] = [
+  scalarKey('ViewRange', 'Max view range (default 1)'),
+  scalarKey('Width', 'Display width'),
+  scalarKey('Height', 'Display height'),
+  scalarKey('ShadowRadius', 'Shadow radius'),
+  scalarKey('ShadowStrength', 'Shadow opacity'),
+  scalarKey('Billboard', DISPLAY_BILLBOARDS.join(' | ')),
+  scalarKey('TeleportDuration', 'Teleport duration in ticks'),
+  scalarKey('InterpolationDelay', 'Interpolation delay in ticks'),
+  scalarKey('InterpolationDuration', 'Interpolation duration in ticks'),
+  scalarKey('ColorOverride', 'Glow color (a,r,g,b or int)'),
+  scalarKey('BlockLight', 'Block light 0-15 (-1 = ambient)'),
+  scalarKey('SkyLight', 'Sky light 0-15 (-1 = ambient)'),
+  scalarKey('Translation', 'Offset x,y,z'),
+  scalarKey('Scale', 'Scale x,y,z'),
+  scalarKey('LeftRotation', 'Quaternion or euler'),
+  scalarKey('RightRotation', 'Quaternion or euler'),
+  scalarKey('Block', 'Block state (block_display)'),
+  scalarKey('Item', 'Item id (item_display)'),
+  scalarKey('Transform', DISPLAY_TRANSFORMS.join(' | ')),
+  quotedKey('Text', 'Text to show (text_display)'),
+  scalarKey('Opacity', 'Text opacity 0-255'),
+  boolKey('DefaultBackground', false, 'Use chat background color'),
+  scalarKey('BackgroundColor', 'Background color (a,r,g,b or int)'),
+  scalarKey('Alignment', DISPLAY_ALIGNMENTS.join(' | ')),
+  scalarKey('LineWidth', 'Max line width'),
+  boolKey('Shadowed', false, 'Text shadow'),
+  boolKey('SeeThrough', false, 'Visible through blocks'),
+]
+
+export const MANNEQUIN_OPTIONS_DEFS: BodyKeyDef[] = [
+  boolKey('Immovable', false, 'Cannot be moved'),
+  quotedKey('Description', 'Text below the name'),
+  boolKey('HideDescription', false, 'Hide description'),
+  scalarKey('MainHand', MANNEQUIN_MAIN_HANDS.join(' | ')),
+  scalarKey('Pose', `e.g. ${MANNEQUIN_POSE_STARTERS.slice(0, 4).join(', ')}`),
+  quotedKey('Player', 'Player name for skin'),
+  quotedKey('Skin', 'Skin texture path'),
+  quotedKey('Cape', 'Cape texture path'),
+  quotedKey('Elytra', 'Elytra texture path'),
+  scalarKey('Model', MANNEQUIN_MODELS.join(' | ')),
+]
+
+export const DROP_OPTIONS_ITEM_VFX_DEFS: BodyKeyDef[] = [
+  scalarKey('Material', 'Default VFX material'),
+  scalarKey('Model', 'Default VFX model data'),
+]
+
+export const DROP_OPTIONS_DEFS: BodyKeyDef[] = [
+  scalarKey('DropMethod', DROP_METHODS.join(' | ')),
+  boolKey('ShowDeathChatMessage', false),
+  boolKey('ShowDeathHologram', false),
+  boolKey('PerPlayerDrops', false, 'Paper only'),
+  boolKey('ClientSideDrops', false),
+  boolKey('Lootsplosion', false),
+  boolKey('HologramItemNames', false),
+  boolKey('ItemGlowByDefault', false),
+  boolKey('ItemBeamByDefault', false),
+  boolKey('ItemVFXByDefault', false),
+  mapKey('ItemVFX', 'Default item VFX', 6),
+  scalarKey('RequiredDamagePercent', 'Min damage share for drops'),
+  scalarKey('HologramTimeout', 'Hologram lifetime (default 6000)'),
+  { key: 'HologramMessage', detail: 'Death hologram lines', apply: 'HologramMessage:\n  - ' },
+  { key: 'ChatMessage', detail: 'Death chat lines', apply: 'ChatMessage:\n  - ' },
+]
+
+export const LEVEL_MODIFIERS_DEFS: BodyKeyDef[] = [
+  scalarKey('Health', 'Health per level'),
+  scalarKey('Damage', 'Damage per level'),
+  scalarKey('KnockbackResistance', 'Knockback resistance per level'),
+  scalarKey('Power', 'Skill power per level'),
+  scalarKey('Armor', 'Armor per level'),
+  scalarKey('MovementSpeed', 'Movement speed per level'),
 ]
 
 export const LEVELING_DEFS: BodyKeyDef[] = [
@@ -79,7 +162,7 @@ export const STAT_FORMATTING_DEFS: BodyKeyDef[] = [
 ]
 
 export const REAGENT_BAR_STATE_DEFS: BodyKeyDef[] = [
-  scalarKey('Display', 'Bar display format'),
+  quotedKey('Display', 'Bar display format'),
   scalarKey('BarLength', 'Bar character count'),
   scalarKey('BarFiller', 'Filled bar character'),
   scalarKey('BarSpacer', 'Empty bar character'),
@@ -152,7 +235,7 @@ export const CRUCIBLE_AUGMENT_REMOVER_DEFS: BodyKeyDef[] = [
 
 export const CRUCIBLE_INVENTORY_DEFS: BodyKeyDef[] = [
   scalarKey('Size', 'Bag slot count'),
-  scalarKey('Title', 'Bag GUI title'),
+  quotedKey('Title', 'Bag GUI title'),
   boolKey('PreventBagNesting', true, 'Prevent bags inside bags'),
   boolKey('SaveOnItemUpdate', true, 'Keep contents on item update'),
   mapKey('AutoPickup', 'Auto pickup config', 6),
@@ -161,7 +244,7 @@ export const CRUCIBLE_INVENTORY_DEFS: BodyKeyDef[] = [
 export const QUEST_REWARD_ITEM_DEFS: BodyKeyDef[] = [
   scalarKey('material', 'Item material'),
   scalarKey('amount', 'Stack size'),
-  scalarKey('name', 'Custom item name'),
+  quotedKey('name', 'Custom item name'),
   scalarKey('chance', 'Drop chance 0-100'),
 ]
 
@@ -178,7 +261,7 @@ export const DIFFICULTY_MULTIPLIER_DEFS: BodyKeyDef[] = [
 ]
 
 export const CLASS_DISPLAY_DEFS: BodyKeyDef[] = [
-  scalarKey('name', 'Class display name'),
+  quotedKey('name', 'Class display name'),
   listKey('lore', 'Class lore lines'),
   listKey('attribute-lore', 'Attribute lore lines'),
   scalarKey('item', 'GUI material'),
@@ -231,7 +314,7 @@ export const CLASS_MANA_DEFS: BodyKeyDef[] = [
   scalarKey('char', 'Mana bar character'),
   scalarKey('icon', 'Mana icon'),
   mapKey('color', 'Bar colors', 8),
-  scalarKey('name', 'Mana display name'),
+  quotedKey('name', 'Mana display name'),
 ]
 
 export const CLASS_MANA_COLOR_DEFS: BodyKeyDef[] = [
@@ -243,7 +326,7 @@ export const CLASS_MANA_COLOR_DEFS: BodyKeyDef[] = [
 export const MYTHICLIB_SKILL_BODY_DEFS: BodyKeyDef[] = [
   mapKey('parameters', 'Skill parameters', 4),
   listKey('categories', 'Skill categories'),
-  scalarKey('name', 'Skill display name'),
+  quotedKey('name', 'Skill display name'),
   listKey('lore', 'Skill lore'),
   mapKey('icon', 'Icon material', 4),
   scalarKey('source', 'MythicMobs skill source id'),
@@ -265,8 +348,14 @@ export const MOB_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
   ),
   BossBar: mapBlock('BossBar', BOSS_BAR_DEFS),
   Modules: mapBlock('Modules', MODULES_DEFS),
+  // Legacy nested Disguise maps only; prefer scalar Disguise: on the mob body.
   Disguise: mapBlock('Disguise', DISGUISE_DEFS),
   ThreatTable: mapBlock('ThreatTable', THREAT_TABLE_DEFS),
+  DisplayOptions: mapBlock('DisplayOptions', DISPLAY_OPTIONS_DEFS),
+  MannequinOptions: mapBlock('MannequinOptions', MANNEQUIN_OPTIONS_DEFS),
+  DropOptions: mapBlock('DropOptions', DROP_OPTIONS_DEFS),
+  ItemVFX: mapBlock('ItemVFX', DROP_OPTIONS_ITEM_VFX_DEFS, 6),
+  LevelModifiers: mapBlock('LevelModifiers', LEVEL_MODIFIERS_DEFS),
 }
 
 export const SPELL_NESTED_BLOCKS: Record<string, NestedBlockDef> = {

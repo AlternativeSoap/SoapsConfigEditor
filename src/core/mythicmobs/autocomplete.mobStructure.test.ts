@@ -109,6 +109,17 @@ describe('mob body-key apply snippets', () => {
     expect(applyForLabel(result, 'Type')).toBe('Type: ')
   })
 
+  it('inserts Display with empty quotes', () => {
+    const result = completeAt(
+      `Skeletal:
+  Type: ZOMBIE
+  Dis
+`,
+      3,
+    )
+    expect(applyForLabel(result, 'Display')).toBe('Display: ""')
+  })
+
   it('skips body keys already present as siblings', () => {
     const result = completeAt(
       `Skeletal:
@@ -240,7 +251,7 @@ describe('MythicRPG and pack-level categories', () => {
       undefined,
       'archetypes',
     )
-    expect(applyForLabel(result, 'Display')).toBe('Display: ')
+    expect(applyForLabel(result, 'Display')).toBe('Display: ""')
   })
 
   it('returns stat body keys with apply snippets', () => {
@@ -267,7 +278,7 @@ describe('SoapsQuest quest body keys', () => {
       undefined,
       'quests',
     )
-    expect(applyForLabel(result, 'display')).toBe('display: ')
+    expect(applyForLabel(result, 'display')).toBe('display: ""')
   })
 
   it('suggests objectives block snippet', () => {
@@ -293,7 +304,7 @@ describe('SoapsQuest quest body keys', () => {
       undefined,
       'tiers',
     )
-    expect(applyForLabel(result, 'display')).toBe('display: ')
+    expect(applyForLabel(result, 'display')).toBe('display: ""')
   })
 })
 
@@ -774,5 +785,141 @@ resource:
       'quests',
     )
     expect(applyForLabel(result, 'objectives')).toBe('objectives:\n    - type: ')
+  })
+})
+
+describe('guided catalog expansions', () => {
+  it('suggests DisplayOptions keys and Billboard enums', () => {
+    const keys = completeAt(
+      `DisplayMob:
+  Type: block_display
+  DisplayOptions:
+    Bil
+`,
+      4,
+    )
+    expect(applyForLabel(keys, 'Billboard')).toBe('Billboard: ')
+    const enums = completeAt(
+      `DisplayMob:
+  Type: block_display
+  DisplayOptions:
+    Billboard: F
+`,
+      4,
+    )
+    const labels = enums?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('FIXED')
+  })
+
+  it('suggests MannequinOptions keys and MainHand enums', () => {
+    const keys = completeAt(
+      `Npc:
+  Type: MANNEQUIN
+  MannequinOptions:
+    Mai
+`,
+      4,
+    )
+    expect(applyForLabel(keys, 'MainHand')).toBe('MainHand: ')
+    const enums = completeAt(
+      `Npc:
+  Type: MANNEQUIN
+  MannequinOptions:
+    MainHand: L
+`,
+      4,
+    )
+    expect(enums?.options.map((o) => o.label)).toContain('LEFT')
+  })
+
+  it('suggests DropOptions and LevelModifiers keys', () => {
+    const drop = completeAt(
+      `Boss:
+  Type: ZOMBIE
+  DropOptions:
+    Drop
+`,
+      4,
+    )
+    expect(applyForLabel(drop, 'DropMethod')).toBe('DropMethod: ')
+    const method = completeAt(
+      `Boss:
+  DropOptions:
+    DropMethod: F
+`,
+      3,
+    )
+    expect(method?.options.map((o) => o.label)).toContain('FANCY')
+    const level = completeAt(
+      `Boss:
+  LevelModifiers:
+    Pow
+`,
+      3,
+    )
+    expect(applyForLabel(level, 'Power')).toBe('Power: ')
+  })
+
+  it('applies Disguise as an inline scalar', () => {
+    const result = completeAt(
+      `Skeletal:
+  Type: ZOMBIE
+  Dis
+`,
+      3,
+    )
+    expect(applyForLabel(result, 'Disguise')).toBe('Disguise: ')
+  })
+
+  it('suggests RandomSpawn PositionType and UseWorldScaling', () => {
+    const pos = completeAt(
+      `ForestSpawn:
+  Action: ADD
+  PositionType: L
+`,
+      3,
+      undefined,
+      'randomspawns',
+    )
+    expect(pos?.options.map((o) => o.label)).toContain('LAND')
+    const ws = completeAt(
+      `ForestSpawn:
+  UseWorldScaling: t
+`,
+      2,
+      undefined,
+      'randomspawns',
+    )
+    expect(ws?.options.map((o) => o.label)).toContain('true')
+  })
+
+  it('offers unused body keys on a blank indented line after Type', () => {
+    const result = completeAt(
+      `Skeletal:
+  Type: ZOMBIE
+  
+`,
+      3,
+    )
+    const labels = result?.options.map((o) => o.label) ?? []
+    expect(labels).toContain('Health')
+    expect(labels).toContain('Display')
+    expect(labels).not.toContain('Type')
+  })
+
+  it('offers entity id starter on an empty mob file', () => {
+    const result = completeAt('', 1)
+    expect(applyForLabel(result, 'MyMob')).toBe('MyMob:\n  ')
+  })
+
+  it('includes DisplayOptions in body-key suggestions', () => {
+    const result = completeAt(
+      `Skeletal:
+  Type: ZOMBIE
+  Disp
+`,
+      3,
+    )
+    expect(applyForLabel(result, 'DisplayOptions')).toBe('DisplayOptions:\n    ')
   })
 })

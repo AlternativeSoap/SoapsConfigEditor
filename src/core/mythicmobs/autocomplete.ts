@@ -62,11 +62,19 @@ import { ALL_OBJECTIVE_TYPES } from '../../data/soapsquest/objectiveTypes'
 import {
   BOSS_BAR_COLORS,
   BOSS_BAR_STYLES,
+  DISPLAY_ALIGNMENTS,
+  DISPLAY_BILLBOARDS,
+  DISPLAY_TRANSFORMS,
+  DROP_METHODS,
   EXPERIENCE_CURVE_TYPES,
   EXPERIENCE_SOURCE_TYPES,
   ARCHETYPE_GROUPS,
   AI_GOAL_APPLY,
   AI_TARGET_APPLY,
+  MANNEQUIN_MAIN_HANDS,
+  MANNEQUIN_MODELS,
+  MANNEQUIN_POSE_STARTERS,
+  RANDOMSPAWN_POSITION_TYPES,
 } from '../../data/mythicmobs/nestedEnums'
 import { completionScrollLoadMore } from './completionScrollLoad'
 import { isPackInfoFile } from './packInfo'
@@ -135,9 +143,31 @@ function mobOptionCompletions(names: string[]): Completion[] {
   })
 }
 
-function bodyKeyPattern(indent: number): RegExp {
-  if (indent === 0) return /^([A-Za-z][A-Za-z0-9_-]*)$/
-  return new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`)
+function bodyKeyTypedPrefix(before: string, indent: number): string | null {
+  if (indent === 0) {
+    if (before === '') return ''
+    const m = /^([A-Za-z][A-Za-z0-9_-]*)$/.exec(before)
+    return m ? (m[1] ?? '') : null
+  }
+  if (new RegExp(`^\\s{${indent}}$`).test(before)) return ''
+  const m = new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
+  return m ? (m[1] ?? '') : null
+}
+
+/** Typed prefix on a nested map key line (supports blank indent-only lines). */
+function nestedMapTypedPrefix(before: string, indent: number, lineIndent: number): string | null {
+  if (lineIndent !== indent) return null
+  if (new RegExp(`^\\s{${indent}}$`).test(before)) return ''
+  const m = new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
+  return m ? (m[1] ?? '') : null
+}
+
+/** Same-indent Options / Equipment key line (indent 2 or 4), including blank. */
+function optionKeyTypedPrefix(before: string, lineIndent: number): string | null {
+  if (lineIndent !== 2 && lineIndent !== 4) return null
+  if (new RegExp(`^\\s{${lineIndent}}$`).test(before)) return ''
+  const m = new RegExp(`^\\s{${lineIndent}}([A-Za-z][A-Za-z0-9_]*)$`).exec(before)
+  return m ? (m[1] ?? '') : null
 }
 
 function damageModifierListCompletions(typed: string, from: number): CompletionResult | null {
@@ -179,7 +209,10 @@ function nestedMapCompletions(
 ): CompletionResult | null {
   const defs = block.entries as BodyKeyDef[]
   const present = collectSiblingBodyKeys(doc, lineNumber, siblingIndent)
-  const options = fieldCompletions(defs.filter((d) => !present.has(d.key)))
+  const options = fieldCompletions(
+    defs.filter((d) => !present.has(d.key)),
+    true,
+  )
   return completionResult(from, filterByPrefix(options, typed), /^[A-Za-z][A-Za-z0-9_-]*$/)
 }
 
@@ -195,14 +228,14 @@ function nestedYamlCompletions(
 
   // MMOCore class indent-8: attribute values and skill bindings only under those sections.
   if (fileCategory === 'classes' && lineIndent === 8) {
-    const keyMatch = /^\s{8}([a-z][a-z0-9-]*)$/.exec(before)
-    if (keyMatch) {
-      const typed = keyMatch[1] ?? ''
+    const typed = nestedMapTypedPrefix(before, 8, lineIndent)
+    if (typed !== null) {
       const from = context.pos - typed.length
       if (hasYamlAncestorKey(context.state.doc, lineNumber, 8, 'attributes')) {
         const present = collectSiblingBodyKeys(context.state.doc, lineNumber, 8)
         const options = fieldCompletions(
           CLASS_ATTRIBUTE_VALUE_DEFS.filter((d) => !present.has(d.key)),
+          true,
         )
         return completionResult(from, filterByPrefix(options, typed), /^[a-z][a-z0-9-]*$/)
       }
@@ -210,6 +243,7 @@ function nestedYamlCompletions(
         const present = collectSiblingBodyKeys(context.state.doc, lineNumber, 8)
         const options = fieldCompletions(
           CLASS_SKILL_BINDING_DEFS.filter((d) => !present.has(d.key)),
+          true,
         )
         return completionResult(from, filterByPrefix(options, typed), /^[a-z][a-z0-9-]*$/)
       }
@@ -228,9 +262,8 @@ function nestedYamlCompletions(
   ) {
     const indents = [8, 6]
     for (const indent of indents) {
-      const keyMatch = new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
-      if (keyMatch && lineIndent === indent) {
-        const typed = keyMatch[1] ?? ''
+      const typed = nestedMapTypedPrefix(before, indent, lineIndent)
+      if (typed !== null) {
         return nestedMapCompletions(
           context.state.doc,
           lineNumber,
@@ -251,9 +284,8 @@ function nestedYamlCompletions(
     const indents = [block.childIndent]
     if (block.childIndent >= 2) indents.push(block.childIndent - 2)
     for (const indent of indents) {
-      const keyMatch = new RegExp(`^\\s{${indent}}([A-Za-z][A-Za-z0-9_-]*)$`).exec(before)
-      if (keyMatch && lineIndent === indent) {
-        const typed = keyMatch[1] ?? ''
+      const typed = nestedMapTypedPrefix(before, indent, lineIndent)
+      if (typed !== null) {
         return nestedMapCompletions(
           context.state.doc,
           lineNumber,
@@ -318,6 +350,29 @@ function nestedEnumValueCompletions(
     if (color) return color
     const style = scalarEnum(/^\s+Style:\s+([A-Za-z0-9_]*)$/, BOSS_BAR_STYLES, /^[A-Za-z0-9_]*$/)
     if (style) return style
+  }
+
+  if (parent === 'DisplayOptions') {
+    const billboard = scalarEnum(/^\s+Billboard:\s+([A-Za-z_]*)$/, DISPLAY_BILLBOARDS, /^[A-Za-z_]*$/)
+    if (billboard) return billboard
+    const transform = scalarEnum(/^\s+Transform:\s+([A-Za-z_]*)$/, DISPLAY_TRANSFORMS, /^[A-Za-z_]*$/)
+    if (transform) return transform
+    const alignment = scalarEnum(/^\s+Alignment:\s+([A-Za-z_]*)$/, DISPLAY_ALIGNMENTS, /^[A-Za-z_]*$/)
+    if (alignment) return alignment
+  }
+
+  if (parent === 'MannequinOptions') {
+    const hand = scalarEnum(/^\s+MainHand:\s+([A-Za-z_]*)$/, MANNEQUIN_MAIN_HANDS, /^[A-Za-z_]*$/)
+    if (hand) return hand
+    const model = scalarEnum(/^\s+Model:\s+([A-Za-z_]*)$/, MANNEQUIN_MODELS, /^[A-Za-z_]*$/)
+    if (model) return model
+    const pose = scalarEnum(/^\s+Pose:\s+([A-Za-z_]*)$/, MANNEQUIN_POSE_STARTERS, /^[A-Za-z_]*$/)
+    if (pose) return pose
+  }
+
+  if (parent === 'DropOptions') {
+    const method = scalarEnum(/^\s+DropMethod:\s+([A-Za-z_]*)$/, DROP_METHODS, /^[A-Za-z_]*$/)
+    if (method) return method
   }
 
   if (parent === 'Sources' || fileCategory === 'experience-curves' || fileCategory === 'exp-curves') {
@@ -644,22 +699,27 @@ function yamlStructureCompletions(
 
   const bodyIndent = bodyKeyIndentForCategory(fileCategory)
   if (bodyIndent !== null) {
-    const bodyKeyMatch = bodyKeyPattern(bodyIndent).exec(before)
+    const typed = bodyKeyTypedPrefix(before, bodyIndent)
     // Skip when inside a nested block (Options, BossBar, ...) at the same indent.
-    if (bodyKeyMatch && yamlCtx.lineIndent === bodyIndent && !yamlCtx.parentKey) {
-      const typed = bodyKeyMatch[1] ?? ''
+    if (typed !== null && yamlCtx.lineIndent === bodyIndent && !yamlCtx.parentKey) {
       const defs = bodyKeyDefsForCategory(fileCategory, crucible)
       if (defs.length) {
         const lineNo = context.state.doc.lineAt(context.pos).number
         const present = collectSiblingBodyKeys(context.state.doc, lineNo, bodyIndent)
         const filtered = defs.filter((d) => !present.has(d.key))
-        const options = fieldCompletions(filtered)
-        const validFor =
-          bodyIndent === 0 ? /^[A-Za-z][A-Za-z0-9_-]*$/ : /^[A-Za-z][A-Za-z0-9_-]*$/
-        return completionResult(context.pos - typed.length, filterByPrefix(options, typed), validFor)
+        const options = fieldCompletions(filtered, true)
+        return completionResult(
+          context.pos - typed.length,
+          filterByPrefix(options, typed),
+          /^[A-Za-z][A-Za-z0-9_-]*$/,
+        )
       }
     }
   }
+
+  // Internal name / entity id starters (indent 0, or quest entity at indent 2)
+  const entityStarter = entityIdStarterCompletions(context, before, fileCategory)
+  if (entityStarter) return entityStarter
 
   // Crucible Options keys under Options: (items, or misclassified other)
   if (
@@ -667,13 +727,12 @@ function yamlStructureCompletions(
     yamlCtx.parentKey === 'Options' &&
     (fileCategory === 'items' || fileCategory === 'other' || fileCategory === undefined)
   ) {
-    const optMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
-    if (optMatch && (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 4)) {
-      const typed = optMatch[1] ?? ''
+    const typed = optionKeyTypedPrefix(before, yamlCtx.lineIndent)
+    if (typed !== null) {
       const lineNo = context.state.doc.lineAt(context.pos).number
       const present = collectSiblingMapKeys(context.state.doc, lineNo)
       const filtered = CRUCIBLE_OPTION_DEFS.filter((d) => !present.has(d.key))
-      const options = fieldCompletions(filtered)
+      const options = fieldCompletions(filtered, true)
       const result = completionResult(context.pos - typed.length, filterByPrefix(options, typed), /^[A-Za-z][A-Za-z0-9_]*$/)
       if (result) return result
     }
@@ -719,9 +778,8 @@ function yamlStructureCompletions(
     fileCategory !== 'skills' &&
     !(crucible && (fileCategory === 'other' || fileCategory === undefined))
   ) {
-    const optKeyMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
-    if (optKeyMatch && (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 4)) {
-      const typed = optKeyMatch[1] ?? ''
+    const typed = optionKeyTypedPrefix(before, yamlCtx.lineIndent)
+    if (typed !== null) {
       const lineNo = context.state.doc.lineAt(context.pos).number
       const present = collectSiblingMapKeys(context.state.doc, lineNo)
       const names = MOB_OPTION_NAMES.filter((n) => !present.has(n))
@@ -732,7 +790,7 @@ function yamlStructureCompletions(
     const optValMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*):\s*(.*)$/.exec(before)
     if (optValMatch) {
       const optName = optValMatch[1] ?? ''
-      const typed = optValMatch[2] ?? ''
+      const typedVal = optValMatch[2] ?? ''
       const entry = mobOptionByName(optName)
       if (entry) {
         let values: string[] = []
@@ -742,8 +800,8 @@ function yamlStructureCompletions(
         if (values.length) {
           const options: Completion[] = values.map((v) => ({ label: v, type: 'enum', detail: optName }))
           return completionResult(
-            context.pos - typed.length,
-            filterByPrefix(options, typed),
+            context.pos - typedVal.length,
+            filterByPrefix(options, typedVal),
             /^[A-Za-z0-9_.-]*$/,
           )
         }
@@ -753,9 +811,8 @@ function yamlStructureCompletions(
 
   // Equipment slot keys (parent-key; Mythic same-indent or nested)
   if (yamlCtx.parentKey === 'Equipment' && fileCategory !== 'items') {
-    const slotKeyMatch = /^\s{2,4}([A-Za-z][A-Za-z0-9_]*)$/.exec(before)
-    if (slotKeyMatch && (yamlCtx.lineIndent === 2 || yamlCtx.lineIndent === 4)) {
-      const typed = slotKeyMatch[1] ?? ''
+    const typed = optionKeyTypedPrefix(before, yamlCtx.lineIndent)
+    if (typed !== null) {
       const options: Completion[] = EQUIPMENT_SLOTS.map((k) => ({
         label: k,
         type: 'keyword' as const,
@@ -890,7 +947,7 @@ function yamlStructureCompletions(
     return completionResult(context.pos - typed.length, filterByPrefix(opts, typed), /^[A-Za-z0-9_]*$/)
   }
 
-  // Random spawn Action / Type
+  // Random spawn Action / Type / PositionType / UseWorldScaling
   const actionMatch = /^\s+Action:\s+([A-Za-z_]*)$/.exec(before)
   if (actionMatch && fileCategory === 'randomspawns') {
     const typed = actionMatch[1] ?? ''
@@ -905,7 +962,156 @@ function yamlStructureCompletions(
     return completionResult(context.pos - typed.length, filterByPrefix(opts, typed), /^[A-Za-z0-9_]*$/)
   }
 
+  const posTypeMatch = /^\s+PositionType:\s+([A-Za-z_]*)$/.exec(before)
+  if (posTypeMatch && fileCategory === 'randomspawns') {
+    const typed = posTypeMatch[1] ?? ''
+    const opts: Completion[] = RANDOMSPAWN_POSITION_TYPES.map((a) => ({ label: a, type: 'enum' }))
+    return completionResult(context.pos - typed.length, filterByPrefix(opts, typed), /^[A-Za-z_]*$/)
+  }
+
+  const useWsMatch = /^\s+UseWorldScaling:\s+([A-Za-z]*)$/.exec(before)
+  if (useWsMatch && fileCategory === 'randomspawns') {
+    const typed = useWsMatch[1] ?? ''
+    const opts: Completion[] = BOOLEAN_VALUES.map((v) => ({ label: v, type: 'enum' }))
+    return completionResult(context.pos - typed.length, filterByPrefix(opts, typed), /^[A-Za-z]*$/)
+  }
+
   return null
+}
+
+/** Starter snippets for a new entity / internal name at the category root. */
+function entityIdStarterCompletions(
+  context: CompletionContext,
+  before: string,
+  fileCategory: MythicCategory | undefined,
+): CompletionResult | null {
+  const starters: Partial<
+    Record<MythicCategory, { label: string; detail: string; apply: string; boost?: number }[]>
+  > = {
+    mobs: [
+      {
+        label: 'MyMob',
+        detail: 'Internal name (entity id)',
+        apply: 'MyMob:\n  ',
+        boost: 10,
+      },
+      {
+        label: 'ZOMBIE',
+        detail: 'Vanilla override id (Type optional)',
+        apply: 'ZOMBIE:\n  ',
+        boost: 5,
+      },
+    ],
+    skills: [
+      { label: 'MySkill', detail: 'Internal name (skill id)', apply: 'MySkill:\n  ', boost: 10 },
+    ],
+    items: [
+      { label: 'MyItem', detail: 'Internal name (item id)', apply: 'MyItem:\n  ', boost: 10 },
+    ],
+    droptables: [
+      {
+        label: 'MyDropTable',
+        detail: 'Internal name (droptable id)',
+        apply: 'MyDropTable:\n  ',
+        boost: 10,
+      },
+    ],
+    randomspawns: [
+      {
+        label: 'MyRandomSpawn',
+        detail: 'Internal name (randomspawn id)',
+        apply: 'MyRandomSpawn:\n  ',
+        boost: 10,
+      },
+    ],
+    archetypes: [
+      {
+        label: 'MyArchetype',
+        detail: 'Internal name (archetype id)',
+        apply: 'MyArchetype:\n  ',
+        boost: 10,
+      },
+    ],
+    reagents: [
+      {
+        label: 'MyReagent',
+        detail: 'Internal name (reagent id)',
+        apply: 'MyReagent:\n  ',
+        boost: 10,
+      },
+    ],
+    classes: [
+      {
+        label: 'display',
+        detail: 'Class files start with body keys (no wrapper id)',
+        apply: 'display:\n    name: ',
+        boost: 10,
+      },
+    ],
+    other: [
+      {
+        label: 'MyMob',
+        detail: 'Internal name (entity id)',
+        apply: 'MyMob:\n  ',
+        boost: 10,
+      },
+    ],
+  }
+
+  const questStarters = [
+    {
+      label: 'my_quest',
+      detail: 'Internal name (quest id)',
+      apply: '  my_quest:\n    ',
+      boost: 10,
+    },
+  ]
+
+  if (fileCategory === 'quests') {
+    const line = context.state.doc.lineAt(context.pos)
+    const lineBefore = line.text.slice(0, context.pos - line.from)
+    const lineIndent = lineBefore.match(/^(\s*)/)?.[1]?.length ?? 0
+    if (lineIndent > 2) return null
+    if (lineBefore.trim() !== '' && !/^\s*[A-Za-z][A-Za-z0-9_-]*$/.test(lineBefore)) return null
+    const typed =
+      lineBefore.trim() === '' ? '' : (lineBefore.match(/^\s*([A-Za-z][A-Za-z0-9_-]*)$/)?.[1] ?? '')
+    const opts = filterByPrefix(
+      questStarters.map((s) => ({
+        label: s.label,
+        type: 'class' as const,
+        detail: s.detail,
+        apply: lineIndent >= 2 && s.apply.startsWith('  ') ? s.apply.slice(2) : s.apply,
+        boost: s.boost,
+      })),
+      typed,
+    )
+    return completionResult(context.pos - typed.length, opts, /^[A-Za-z][A-Za-z0-9_-]*$/)
+  }
+
+  if (!fileCategory || !starters[fileCategory]) return null
+  // Indent 0 only (classes body keys also at 0 — starter still useful on empty file)
+  if (before.includes('\n')) return null
+  const lineIndent = before.match(/^(\s*)/)?.[1]?.length ?? 0
+  if (lineIndent !== 0) return null
+  if (before !== '' && !/^[A-Za-z][A-Za-z0-9_-]*$/.test(before)) return null
+  // Do not steal body-key completions for classes when typing known class keys
+  if (fileCategory === 'classes' && before !== '') {
+    const defs = bodyKeyDefsForCategory('classes')
+    if (defs.some((d) => d.key.startsWith(before))) return null
+  }
+
+  const typed = before
+  const opts = filterByPrefix(
+    starters[fileCategory]!.map((s) => ({
+      label: s.label,
+      type: 'class' as const,
+      detail: s.detail,
+      apply: s.apply,
+      boost: s.boost,
+    })),
+    typed,
+  )
+  return completionResult(context.pos - typed.length, opts, /^[A-Za-z][A-Za-z0-9_-]*$/)
 }
 
 /** Walk upward for the nearest YAML key with less indent than the current line. */

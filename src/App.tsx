@@ -1850,7 +1850,7 @@ function App() {
             }}
             placeholder="Select a file from the list."
             packIndex={isMythicMobs || isMMOCore ? packIndex : undefined}
-            acPrefs={isMythicMobs || isMMOCore ? acPrefs : undefined}
+            acPrefs={isMythicMobs || isMMOCore || isSoapsQuest ? acPrefs : undefined}
             fileCategory={
               isMythicMobs || isMMOCore || isSoapsQuest ? activeFile?.category : undefined
             }
