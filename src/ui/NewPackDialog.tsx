@@ -64,7 +64,7 @@ function leadCopy(workspaceId: WorkspaceKind, includeExamples: boolean): string 
 function exampleAddonSummary(addons: MythicAddons): string {
   const parts: string[] = ['MythicMobs core']
   if (addons.mythicrpg) parts.push('MythicRPG spells and archetypes')
-  if (addons.crucible) parts.push('Crucible sets and gear')
+  if (addons.crucible) parts.push('Crucible sets, gear, stats, and lore templates')
   return parts.join(', ')
 }
 

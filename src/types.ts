@@ -39,6 +39,8 @@ export type MythicCategory =
   | 'quests'
   | 'equipment-sets'
   | 'augments'
+  | 'lore-templates'
+  | 'placeholders'
   | 'packinfo'
   | 'stats'
   | 'experience-curves'
@@ -100,6 +102,8 @@ export interface PackIndex {
   archetypeIds: string[]
   equipmentSetIds: string[]
   augmentTypeIds: string[]
+  loreTemplateIds: string[]
+  statIds: string[]
 }
 
 export type CreateKind =
@@ -121,6 +125,9 @@ export type CreateKind =
   | 'augment-type'
   | 'crucible-item'
   | 'bag'
+  | 'crucible-stat'
+  | 'lore-template'
+  | 'placeholder'
 
 /** Shared skill modifier used by MMOCore class skills + MythicLib parameters. */
 export interface SkillModifierValues {
@@ -418,7 +425,31 @@ export interface AugmentTypeGeneratorInput {
 }
 
 export type CrucibleItemKind = 'ITEM' | 'BAG' | 'HAT'
-export type CrucibleItemRole = 'standard' | 'gem' | 'socket' | 'remover'
+export type CrucibleItemRole = 'standard' | 'gem' | 'socket' | 'remover' | 'consumable'
+export type CrucibleRecipeType =
+  | ''
+  | 'SHAPED'
+  | 'SHAPELESS'
+  | 'FURNACE'
+  | 'CAMPFIRE'
+  | 'BLASTING'
+  | 'SMOKING'
+  | 'STONECUTTING'
+  | 'SMITHING'
+  | 'BREWING'
+export type CrucibleConsumableMode = 'none' | 'potion' | 'food' | 'both'
+
+export interface CrucibleAugmentSlotInput {
+  type: string
+  amount: string
+  chance: string
+  maxAmount: string
+}
+
+export interface CrucibleLevelDescRow {
+  level: string
+  text: string
+}
 
 export interface CrucibleItemGeneratorInput {
   id: string
@@ -445,24 +476,82 @@ export interface CrucibleItemGeneratorInput {
   durability: string
   defaultLevel: string
   maxLevel: string
-  /** Single slot type, or empty */
-  augmentSlotType: string
-  augmentSlotAmount: string
-  augmentSlotChance: string
-  augmentSlotMaxAmount: string
+  setEquipLevel: boolean
+  defaultLevelDescription: string
+  defaultUpgradeDescription: string
+  levelDescriptions: CrucibleLevelDescRow[]
+  upgradeDescriptions: CrucibleLevelDescRow[]
+  upgradeEquations: string
+  augmentSlots: CrucibleAugmentSlotInput[]
   /** Gem / socket / remover type id */
   augmentType: string
   augmentTooltip: string
   augmentRemoverDestroySocket: boolean
   augmentRemoverReturnAugment: boolean
   augmentSocketMaxSockets: number
+  consumableMode: CrucibleConsumableMode
+  potionType: string
+  potionDuration: string
+  potionAmplifier: string
+  potionAmbient: boolean
+  potionParticles: boolean
+  foodNutrition: string
+  foodSaturation: string
+  foodCanAlwaysEat: boolean
   bagSize: number
   bagTitle: string
   bagPreventNesting: boolean
   bagSaveOnUpdate: boolean
   bagAutoPickup: boolean
-  recipeType: '' | 'SHAPED' | 'SHAPELESS'
+  bagAutoPickupOnlyWhenFull: boolean
+  bagSoundOpen: string
+  bagSoundClose: string
+  bagSoundPickup: string
+  bagSoundVolume: string
+  bagSoundPitch: string
+  bagNearlyFullEnabled: boolean
+  bagNearlyFullThreshold: string
+  bagNearlyFullMessage: string
+  bagBlacklist: string
+  bagWhitelist: string
+  recipeType: CrucibleRecipeType
+  recipeAmount: number
   recipeIngredients: string
+  recipeIngredient: string
+  recipeCookingTime: string
+  recipeExperience: string
+  recipeInputItem: string
+  recipeSmithingTemplate: string
+  recipeLeftover: string
+  recipeConditions: string
+  recipeCraftSkills: string
 }
+
+export interface CrucibleStatGeneratorInput {
+  id: string
+  display: string
+  baseValue: number
+  formattingEnabled: boolean
+  nameFormat: string
+  valueFormat: string
+}
+
+export type CruciblePlaceholderKind = 'simple' | 'random' | 'conditional'
+
+export interface CrucibleLoreTemplateGeneratorInput {
+  id: string
+  lines: string
+}
+
+export interface CruciblePlaceholderGeneratorInput {
+  id: string
+  kind: CruciblePlaceholderKind
+  value: string
+  randomValues: string
+  dayValue: string
+  nightValue: string
+  defaultValue: string
+}
+
 
 

@@ -12,6 +12,7 @@ import {
 import { toBlockConditionSnippet, toInlineConditionSnippet } from '../../data/mythicmobs/conditions'
 import type { AcPrefs, MythicCategory } from '../../types'
 import {
+  augmentBraceAttrs,
   buildBraceAttrValueCompletions,
   ENTITY_TYPES,
   MATERIALS,
@@ -549,9 +550,10 @@ function braceAttrCompletion(
     attrs: MechanicAttr[],
     blockId: string,
   ): CompletionResult | null => {
+    const merged = augmentBraceAttrs(attrs, blockId)
     const valueResult = buildBraceAttrValueCompletions(
       inside,
-      attrs,
+      merged,
       blockId,
       context,
       packSkillIds,
@@ -560,7 +562,7 @@ function braceAttrCompletion(
       packDroptableIds,
     )
     if (valueResult) return valueResult
-    return buildBraceAttrCompletions(inside, attrs, context)
+    return buildBraceAttrCompletions(inside, merged, context)
   }
 
   const mechMatch = /^\s+-\s+([A-Za-z][A-Za-z0-9_]*)\{([^}]*)$/.exec(before)

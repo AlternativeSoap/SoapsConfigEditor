@@ -181,6 +181,11 @@ export const MECHANICS: MechanicEntry[] = [
   ]},
   { id: 'particle', aliases: [], category: 'effects', description: 'Creates particle effects around the target', insertSnippet: 'particle{particle=FLAME;amount=10;hS=0.5;vS=0.5}', attributes: [
     { name: 'particle', type: 'enum', default: 'FLAME', desc: 'Particle type' },
+    { name: 'audience', type: 'enum', default: 'tracked', desc: 'Who can see this effect' },
+    { name: 'color', type: 'string', default: '#FF0000', desc: 'Hex color (required for DUST)' },
+    { name: 'size', type: 'number', default: '1', desc: 'Dust particle size' },
+    { name: 'color2', type: 'string', default: '#0000FF', desc: 'End hex color for dust transition' },
+    { name: 'material', type: 'string', default: 'STONE', desc: 'Material for block or item particles' },
     { name: 'amount', type: 'number', default: '10' },
     { name: 'hS', type: 'number', default: '0.5', desc: 'Horizontal spread' },
     { name: 'vS', type: 'number', default: '0.5', desc: 'Vertical spread' },

@@ -435,7 +435,7 @@ describe('mob DamageModifiers autocomplete', () => {
   - clear
   - melee`
     const result = completeAt(yaml, 5, undefined, 'other', false, false)
-    expect(applyForLabel(result, 'meleeattack')).toBe('meleeattack{speed=1}')
+    expect(applyForLabel(result, 'meleeattack')).toBe('meleeattack')
   })
 
   it('suggests body keys when typing a new field below a list section', () => {
@@ -576,7 +576,7 @@ describe('nested blocks beyond mobs', () => {
 `,
       4,
     )
-    expect(applyForLabel(result, 'meleeattack')).toBe('meleeattack{speed=1}')
+    expect(applyForLabel(result, 'meleeattack')).toBe('meleeattack')
   })
 
   it('suggests archetype Group values', () => {

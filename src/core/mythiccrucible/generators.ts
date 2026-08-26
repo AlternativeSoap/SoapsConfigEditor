@@ -2,6 +2,9 @@ import { formatSkillsYamlBlock, yamlQuoted } from '../mythicmobs/generators'
 import type {
   AugmentTypeGeneratorInput,
   CrucibleItemGeneratorInput,
+  CrucibleLoreTemplateGeneratorInput,
+  CruciblePlaceholderGeneratorInput,
+  CrucibleStatGeneratorInput,
   EquipmentSetGeneratorInput,
 } from '../../types'
 
@@ -15,6 +18,10 @@ function listLines(raw: string): string[] {
 function pushSkillsBlock(lines: string[], raw: string, indent: string): void {
   const block = formatSkillsYamlBlock(raw, { indent })
   if (block) lines.push(block)
+}
+
+function parseDescRows(rows: { level: string; text: string }[]): { level: string; text: string }[] {
+  return rows.filter((r) => r.level.trim() && r.text.trim())
 }
 
 export function resolvePackRoot(files: { path: string; pack: string }[], packName: string): string {
@@ -40,6 +47,18 @@ export function suggestAugmentsPath(packRoot: string): string {
 
 export function suggestCrucibleItemPath(packRoot: string): string {
   return `${packRoot}/Items/items.yml`
+}
+
+export function suggestCrucibleStatsPath(packRoot: string): string {
+  return `${packRoot}/stats.yml`
+}
+
+export function suggestLoreTemplatesPath(packRoot: string): string {
+  return `${packRoot}/lore-templates.yml`
+}
+
+export function suggestPlaceholdersPath(packRoot: string): string {
+  return `${packRoot}/placeholders.yml`
 }
 
 export function generateEquipmentSetYaml(input: EquipmentSetGeneratorInput): string {
@@ -91,6 +110,239 @@ export function generateAugmentTypeYaml(input: AugmentTypeGeneratorInput): strin
   return `${lines.join('\n')}\n`
 }
 
+export function generateCrucibleStatYaml(input: CrucibleStatGeneratorInput): string {
+  const id = input.id.trim().toUpperCase().replace(/\s+/g, '_') || 'MY_STAT'
+  const lines: string[] = [`${id}:`]
+  if (input.display.trim()) {
+    lines.push(`  Display: ${yamlQuoted(input.display.trim())}`)
+  }
+  lines.push(`  BaseValue: ${input.baseValue}`)
+  if (input.formattingEnabled) {
+    lines.push('  Formatting:')
+    lines.push('    Enabled: true')
+    if (input.nameFormat.trim()) {
+      lines.push(`    Name: ${yamlQuoted(input.nameFormat.trim())}`)
+    }
+    if (input.valueFormat.trim()) {
+      lines.push(`    Value: ${yamlQuoted(input.valueFormat.trim())}`)
+    }
+  }
+  return `${lines.join('\n')}\n`
+}
+
+export function generateLoreTemplateYaml(input: CrucibleLoreTemplateGeneratorInput): string {
+  const id = input.id.trim().replace(/\s+/g, '_') || 'MyTemplate'
+  const lines: string[] = [`${id}:`]
+  lines.push('  Lines:')
+  const loreLines = listLines(input.lines)
+  if (loreLines.length === 0) {
+    lines.push(`  - ''`)
+  } else {
+    for (const line of loreLines) {
+      lines.push(`  - ${yamlQuoted(line)}`)
+    }
+  }
+  return `${lines.join('\n')}\n`
+}
+
+export function generatePlaceholderYaml(input: CruciblePlaceholderGeneratorInput): string {
+  const id = input.id.trim().replace(/\s+/g, '_') || 'MyPlaceholder'
+  if (input.kind === 'simple') {
+    return `${id}: ${yamlQuoted(input.value.trim() || 'value')}\n`
+  }
+  if (input.kind === 'random') {
+    const values = listLines(input.randomValues)
+    const lines: string[] = [`${id}:`]
+    for (const v of values.length ? values : ['red', 'green', 'blue']) {
+      lines.push(`- ${yamlQuoted(v)}`)
+    }
+    return `${lines.join('\n')}\n`
+  }
+  const lines: string[] = [`${id}:`]
+  if (input.dayValue.trim()) {
+    lines.push('  Day:')
+    lines.push('    Conditions:')
+    lines.push('    - day')
+    lines.push(`    Value: ${yamlQuoted(input.dayValue.trim())}`)
+  }
+  if (input.nightValue.trim()) {
+    lines.push('  Night:')
+    lines.push('    Conditions:')
+    lines.push('    - night')
+    lines.push(`    Value: ${yamlQuoted(input.nightValue.trim())}`)
+  }
+  lines.push(`  Default: ${yamlQuoted(input.defaultValue.trim() || 'default')}`)
+  return `${lines.join('\n')}\n`
+}
+
+function emitAugmentSlots(lines: string[], input: CrucibleItemGeneratorInput): void {
+  const slots = input.augmentSlots.filter((s) => s.type.trim())
+  if (slots.length === 0) return
+  lines.push('  AugmentationSlots:')
+  if (slots.length === 1) {
+    const slot = slots[0]!
+    lines.push(`    Type: ${slot.type.trim().toUpperCase()}`)
+    lines.push(`    Amount: ${slot.amount.trim() || '1'}`)
+    if (slot.chance.trim()) lines.push(`    Chance: ${slot.chance.trim()}`)
+    if (slot.maxAmount.trim()) lines.push(`    MaxAmount: ${slot.maxAmount.trim()}`)
+    return
+  }
+  for (const slot of slots) {
+    lines.push(`  - Type: ${slot.type.trim().toUpperCase()}`)
+    lines.push(`    Amount: ${slot.amount.trim() || '1'}`)
+    if (slot.chance.trim()) lines.push(`    Chance: ${slot.chance.trim()}`)
+    if (slot.maxAmount.trim()) lines.push(`    MaxAmount: ${slot.maxAmount.trim()}`)
+  }
+}
+
+function emitUpgrades(lines: string[], input: CrucibleItemGeneratorInput): void {
+  const levelRows = parseDescRows(input.levelDescriptions)
+  const upgradeRows = parseDescRows(input.upgradeDescriptions)
+  const equations = listLines(input.upgradeEquations)
+  const hasAny =
+    input.defaultLevel.trim() ||
+    input.maxLevel.trim() ||
+    input.setEquipLevel ||
+    input.defaultLevelDescription.trim() ||
+    input.defaultUpgradeDescription.trim() ||
+    levelRows.length > 0 ||
+    upgradeRows.length > 0 ||
+    equations.length > 0
+  if (!hasAny) return
+
+  lines.push('  Upgrades:')
+  if (input.defaultLevel.trim()) lines.push(`    DefaultLevel: ${input.defaultLevel.trim()}`)
+  if (input.maxLevel.trim()) lines.push(`    MaxLevel: ${input.maxLevel.trim()}`)
+  if (input.setEquipLevel) lines.push('    SetEquipLevel: true')
+  if (input.defaultUpgradeDescription.trim()) {
+    lines.push(`    DefaultUpgradeDescription: ${yamlQuoted(input.defaultUpgradeDescription.trim())}`)
+  }
+  if (upgradeRows.length > 0) {
+    lines.push('    UpgradeDescription:')
+    for (const row of upgradeRows) {
+      lines.push(`      ${row.level.trim()}: ${yamlQuoted(row.text.trim())}`)
+    }
+  }
+  if (input.defaultLevelDescription.trim()) {
+    lines.push(`    DefaultLevelDescription: ${yamlQuoted(input.defaultLevelDescription.trim())}`)
+  }
+  if (levelRows.length > 0) {
+    lines.push('    LevelDescription:')
+    for (const row of levelRows) {
+      lines.push(`      ${row.level.trim()}: ${yamlQuoted(row.text.trim())}`)
+    }
+  }
+  if (equations.length > 0) {
+    lines.push('    Stats:')
+    lines.push('      Equations:')
+    for (const eq of equations) {
+      lines.push(`      - ${eq}`)
+    }
+  }
+}
+
+function emitBagInventory(lines: string[], input: CrucibleItemGeneratorInput): void {
+  const blacklist = listLines(input.bagBlacklist)
+  const whitelist = listLines(input.bagWhitelist)
+  lines.push('  Inventory:')
+  lines.push(`    Size: ${input.bagSize}`)
+  lines.push(`    Title: ${yamlQuoted(input.bagTitle.trim() || input.display.trim() || 'Bag')}`)
+  lines.push(`    PreventBagNesting: ${input.bagPreventNesting}`)
+  lines.push(`    SaveOnItemUpdate: ${input.bagSaveOnUpdate}`)
+  if (input.bagAutoPickup || blacklist.length > 0 || whitelist.length > 0) {
+    lines.push('    AutoPickup:')
+    lines.push(`      Enabled: ${input.bagAutoPickup}`)
+    if (input.bagAutoPickup) {
+      lines.push(`      OnlyWhenFull: ${input.bagAutoPickupOnlyWhenFull}`)
+    }
+    if (blacklist.length > 0) {
+      lines.push('      BlacklistedItems:')
+      for (const item of blacklist) lines.push(`      - ${item}`)
+    }
+    if (whitelist.length > 0) {
+      lines.push('      WhitelistedItems:')
+      for (const item of whitelist) lines.push(`      - ${item}`)
+    }
+  }
+  const hasSounds =
+    input.bagSoundOpen.trim() ||
+    input.bagSoundClose.trim() ||
+    input.bagSoundPickup.trim() ||
+    input.bagSoundVolume.trim() ||
+    input.bagSoundPitch.trim()
+  if (hasSounds) {
+    lines.push('    Sounds:')
+    if (input.bagSoundOpen.trim()) lines.push(`      Open: ${yamlQuoted(input.bagSoundOpen.trim())}`)
+    if (input.bagSoundClose.trim()) lines.push(`      Close: ${yamlQuoted(input.bagSoundClose.trim())}`)
+    if (input.bagSoundPickup.trim()) lines.push(`      Pickup: ${yamlQuoted(input.bagSoundPickup.trim())}`)
+    if (input.bagSoundVolume.trim()) lines.push(`      Volume: ${input.bagSoundVolume.trim()}`)
+    if (input.bagSoundPitch.trim()) lines.push(`      Pitch: ${input.bagSoundPitch.trim()}`)
+  }
+  if (input.bagNearlyFullEnabled) {
+    lines.push('    Notifications:')
+    lines.push('      NearlyFull:')
+    lines.push('        Enabled: true')
+    if (input.bagNearlyFullThreshold.trim()) {
+      lines.push(`        Threshold: ${input.bagNearlyFullThreshold.trim()}`)
+    }
+    if (input.bagNearlyFullMessage.trim()) {
+      lines.push(`        Message: ${yamlQuoted(input.bagNearlyFullMessage.trim())}`)
+    }
+  }
+}
+
+function emitCraftSkills(lines: string[], raw: string, indent: string): void {
+  const block = formatSkillsYamlBlock(raw, { indent })
+  if (!block) return
+  lines.push(block.replace(`${indent}Skills:`, `${indent}CraftSkills:`))
+}
+
+function emitRecipes(lines: string[], input: CrucibleItemGeneratorInput): void {
+  if (!input.recipeType) return
+  const type = input.recipeType
+  const cooking = ['FURNACE', 'CAMPFIRE', 'BLASTING', 'SMOKING', 'STONECUTTING'].includes(type)
+  const shaped = type === 'SHAPED' || type === 'SHAPELESS'
+  if (shaped && listLines(input.recipeIngredients).length === 0) return
+  if (cooking && !input.recipeIngredient.trim()) return
+  if (type === 'BREWING' && (!input.recipeIngredient.trim() || !input.recipeInputItem.trim())) return
+  if (type === 'SMITHING' && !input.recipeIngredient.trim()) return
+
+  lines.push('  Recipes:')
+  lines.push(`    ${type}_1:`)
+  lines.push(`      Type: ${type}`)
+  lines.push(`      Amount: ${input.recipeAmount || 1}`)
+
+  if (shaped) {
+    lines.push('      Ingredients:')
+    for (const row of listLines(input.recipeIngredients)) {
+      lines.push(`      - ${row}`)
+    }
+    const leftover = listLines(input.recipeLeftover)
+    if (leftover.length > 0) {
+      lines.push('      IngredientsLeftover:')
+      for (const left of leftover) lines.push(`      - ${left}`)
+    }
+    const conds = listLines(input.recipeConditions)
+    if (conds.length > 0) {
+      lines.push('      Conditions:')
+      for (const c of conds) lines.push(`      - ${c}`)
+    }
+    emitCraftSkills(lines, input.recipeCraftSkills, '      ')
+  } else if (cooking) {
+    lines.push(`      Ingredient: ${input.recipeIngredient.trim()}`)
+    if (input.recipeCookingTime.trim()) lines.push(`      CookingTime: ${input.recipeCookingTime.trim()}`)
+    if (input.recipeExperience.trim()) lines.push(`      Experience: ${input.recipeExperience.trim()}`)
+  } else if (type === 'SMITHING') {
+    lines.push(`      Ingredient: ${input.recipeIngredient.trim()}`)
+    if (input.recipeSmithingTemplate.trim()) {
+      lines.push(`      Template: ${input.recipeSmithingTemplate.trim()}`)
+    }
+  } else if (type === 'BREWING') {
+    lines.push(`      Ingredient: ${input.recipeIngredient.trim()}`)
+    lines.push(`      InputItem: ${input.recipeInputItem.trim()}`)
+  }
+}
+
 export function generateCrucibleItemYaml(input: CrucibleItemGeneratorInput): string {
   const id = input.id.trim().replace(/\s+/g, '_') || 'MY_ITEM'
   const lines: string[] = [`${id}:`]
@@ -137,7 +389,6 @@ export function generateCrucibleItemYaml(input: CrucibleItemGeneratorInput): str
     ['PreventStacking', input.optionsPreventStacking],
     ['Repairable', input.optionsRepairable],
   ]
-  // Placeable defaults true in game; only emit when false (or other toggles that are true)
   const activeOptions = optionEntries.filter(([key, value]) => {
     if (key === 'Placeable' || key === 'Repairable') return !value
     return value
@@ -165,42 +416,22 @@ export function generateCrucibleItemYaml(input: CrucibleItemGeneratorInput): str
     lines.push(`  Durability: ${input.durability.trim()}`)
   }
 
-  if (input.defaultLevel.trim() || input.maxLevel.trim()) {
-    lines.push('  Upgrades:')
-    if (input.defaultLevel.trim()) {
-      lines.push(`    DefaultLevel: ${input.defaultLevel.trim()}`)
-    }
-    if (input.maxLevel.trim()) {
-      lines.push(`    MaxLevel: ${input.maxLevel.trim()}`)
-    }
-  }
+  emitUpgrades(lines, input)
 
   if (input.equipmentSet.trim()) {
     lines.push(`  EquipmentSet: ${input.equipmentSet.trim().toUpperCase()}`)
   }
 
   const stats = listLines(input.stats)
-  if (stats.length > 0 && input.role !== 'socket' && input.role !== 'remover') {
-    if (input.role === 'gem') {
-      // Stats go under Augmentation below
-    } else {
-      lines.push('  Stats:')
-      for (const stat of stats) {
-        lines.push(`  - ${stat}`)
-      }
+  if (stats.length > 0 && input.role !== 'socket' && input.role !== 'remover' && input.role !== 'gem') {
+    lines.push('  Stats:')
+    for (const stat of stats) {
+      lines.push(`  - ${stat}`)
     }
   }
 
-  if (input.role === 'standard' && input.augmentSlotType.trim()) {
-    lines.push('  AugmentationSlots:')
-    lines.push(`    Type: ${input.augmentSlotType.trim().toUpperCase()}`)
-    lines.push(`    Amount: ${input.augmentSlotAmount.trim() || '1'}`)
-    if (input.augmentSlotChance.trim()) {
-      lines.push(`    Chance: ${input.augmentSlotChance.trim()}`)
-    }
-    if (input.augmentSlotMaxAmount.trim()) {
-      lines.push(`    MaxAmount: ${input.augmentSlotMaxAmount.trim()}`)
-    }
+  if (input.role === 'standard') {
+    emitAugmentSlots(lines, input)
   }
 
   if (input.role === 'gem' && input.augmentType.trim()) {
@@ -231,34 +462,33 @@ export function generateCrucibleItemYaml(input: CrucibleItemGeneratorInput): str
     lines.push(`    ReturnAugment: ${input.augmentRemoverReturnAugment}`)
   }
 
-  if (input.itemKind === 'BAG') {
-    lines.push('  Inventory:')
-    lines.push(`    Size: ${input.bagSize}`)
-    lines.push(`    Title: ${yamlQuoted(input.bagTitle.trim() || input.display.trim() || 'Bag')}`)
-    lines.push(`    PreventBagNesting: ${input.bagPreventNesting}`)
-    lines.push(`    SaveOnItemUpdate: ${input.bagSaveOnUpdate}`)
-    if (input.bagAutoPickup) {
-      lines.push('    AutoPickup:')
-      lines.push('      Enabled: true')
-      lines.push('      OnlyWhenFull: true')
+  if (input.role === 'consumable' || input.consumableMode !== 'none') {
+    const mode = input.consumableMode
+    if (mode === 'potion' || mode === 'both') {
+      lines.push('  Potion:')
+      lines.push(`    Type: ${input.potionType.trim() || 'REGENERATION'}`)
+      if (input.potionDuration.trim()) lines.push(`    Duration: ${input.potionDuration.trim()}`)
+      if (input.potionAmplifier.trim()) lines.push(`    Amplifier: ${input.potionAmplifier.trim()}`)
+      if (input.potionAmbient) lines.push('    Ambient: true')
+      if (!input.potionParticles) lines.push('    Particles: false')
     }
+    if (mode === 'food' || mode === 'both') {
+      lines.push('  Food:')
+      if (input.foodNutrition.trim()) lines.push(`    Nutrition: ${input.foodNutrition.trim()}`)
+      if (input.foodSaturation.trim()) lines.push(`    Saturation: ${input.foodSaturation.trim()}`)
+      if (input.foodCanAlwaysEat) lines.push('    CanAlwaysEat: true')
+    }
+  }
+
+  if (input.itemKind === 'BAG') {
+    emitBagInventory(lines, input)
   }
 
   if (input.role !== 'gem') {
     pushSkillsBlock(lines, input.skills, '  ')
   }
 
-  if (input.recipeType && listLines(input.recipeIngredients).length > 0) {
-    const ingredients = listLines(input.recipeIngredients)
-    lines.push('  Recipes:')
-    lines.push(`    ${input.recipeType}_1:`)
-    lines.push(`      Type: ${input.recipeType}`)
-    lines.push('      Amount: 1')
-    lines.push('      Ingredients:')
-    for (const row of ingredients) {
-      lines.push(`      - ${row}`)
-    }
-  }
+  emitRecipes(lines, input)
 
   return `${lines.join('\n')}\n`
 }

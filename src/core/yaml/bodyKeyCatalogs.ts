@@ -274,6 +274,8 @@ export function bodyKeyIndentForCategory(category?: MythicCategory): number | nu
     case 'reagents':
     case 'equipment-sets':
     case 'augments':
+    case 'lore-templates':
+    case 'placeholders':
     case 'stats':
     case 'experience-curves':
     case 'exp-curves':
@@ -336,6 +338,9 @@ export function bodyKeyDefsForCategory(
       return EQUIPMENT_SET_BODY_DEFS
     case 'augments':
       return AUGMENT_BODY_DEFS
+    case 'lore-templates':
+    case 'placeholders':
+      return []
     case 'stats':
       return STAT_BODY_DEFS
     case 'experience-curves':

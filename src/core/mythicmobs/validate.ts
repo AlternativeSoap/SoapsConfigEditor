@@ -1,6 +1,55 @@
 import type { FileRecord, ValidationIssue } from '../../types'
+import { MINECRAFT_MATERIALS } from '../../data/minecraft/materials'
 import { parseYaml } from '../yaml/parseYaml'
 import { collectMobsFromFiles, getMobField, resolveMob, type MobBody } from './templates'
+import { DROP_BUILTINS } from './yamlEditContext'
+
+/** Extra drop-type prefixes from the MythicMobs drops wiki (not pack IDs). */
+const DROP_TYPE_PREFIXES = [
+  'cmd',
+  'command',
+  'mmoitems',
+  'mythicdrop',
+  'phatloot',
+  'vanillaloottable',
+  'itemvariable',
+  'heroesexp',
+  'champions-exp',
+  'skillapi-exp',
+] as const
+
+const MATERIAL_SET = new Set(MINECRAFT_MATERIALS.map((m) => m.toUpperCase()))
+const DROP_BUILTIN_SET = new Set<string>([
+  ...DROP_BUILTINS.map((b) => b.toLowerCase()),
+  ...DROP_TYPE_PREFIXES,
+])
+
+/** First token of a drop line, without inline `{…}` attributes. */
+function dropBaseToken(entry: string): string | null {
+  const first = entry.trim().split(/\s+/)[0]
+  if (!first) return null
+  return first.split('{')[0] || null
+}
+
+function isResolvedDropToken(
+  token: string,
+  itemIds: Set<string>,
+  droptableIds: Set<string>,
+): boolean {
+  const lower = token.toLowerCase()
+  if (DROP_BUILTIN_SET.has(lower)) return true
+  if (MATERIAL_SET.has(token.toUpperCase())) return true
+  if (itemIds.has(token) || itemIds.has(lower)) return true
+  // Case-insensitive item lookup
+  for (const id of itemIds) {
+    if (id.toLowerCase() === lower) return true
+  }
+  if (droptableIds.has(token)) return true
+  for (const id of droptableIds) {
+    if (id.toLowerCase() === lower) return true
+  }
+  return false
+}
 
 /** Extract skill IDs from a Skills list entry (bare ID or skill{s=ID}). */
 function skillRefFromToken(token: string): string | null {
@@ -36,17 +85,25 @@ function extractSkillRefs(value: unknown): string[] {
   return refs
 }
 
-function extractDropRefs(value: unknown): string[] {
+/**
+ * Drop entry IDs that are not vanilla materials, pack items, builtins, or special
+ * drop types — candidates for missing droptable (or missing mythic item) checks.
+ * See https://wiki.mythiccraft.io/mythicmobs/drops/Drops
+ */
+function extractUnresolvedDropRefs(
+  value: unknown,
+  itemIds: Set<string>,
+  droptableIds: Set<string>,
+): string[] {
   if (!value) return []
   const lines = Array.isArray(value) ? value : []
   const refs: string[] = []
-  const builtins = new Set(['exp', 'money', 'command', 'nothing', 'mcmmo-exp'])
   for (const entry of lines) {
     if (typeof entry !== 'string') continue
-    const first = entry.trim().split(/\s+/)[0]
-    if (first && !builtins.has(first.toLowerCase())) {
-      refs.push(first)
-    }
+    const token = dropBaseToken(entry)
+    if (!token) continue
+    if (isResolvedDropToken(token, itemIds, droptableIds)) continue
+    refs.push(token)
   }
   return refs
 }
@@ -82,13 +139,19 @@ export function validateMobSkillReferences(files: FileRecord[]): ValidationIssue
 }
 
 export function validateDroptableReferences(files: FileRecord[]): ValidationIssue[] {
-  const droptableIds = new Set<string>()
+  const droptableIdsLower = new Set<string>()
+  const itemIdsLower = new Set<string>()
   for (const file of files) {
-    if (file.category !== 'droptables') continue
-    for (const id of file.ids) droptableIds.add(id)
+    if (file.category === 'droptables') {
+      for (const id of file.ids) droptableIdsLower.add(id.toLowerCase())
+    }
+    if (file.category === 'items') {
+      for (const id of file.ids) itemIdsLower.add(id.toLowerCase())
+    }
   }
 
   const issues: ValidationIssue[] = []
+  const seen = new Set<string>()
   for (const file of files) {
     if (file.category !== 'mobs') continue
     const parsed = parseYaml(file.content).data
@@ -96,15 +159,16 @@ export function validateDroptableReferences(files: FileRecord[]): ValidationIssu
     const mobs = parsed as Record<string, Record<string, unknown>>
     for (const mobId of Object.keys(mobs)) {
       const mobDef = mobs[mobId]
-      for (const ref of extractDropRefs(mobDef?.Drops)) {
-        if (!droptableIds.has(ref)) {
-          issues.push({
-            type: 'missing_droptable_reference',
-            filePath: file.path,
-            entityId: mobId,
-            missingId: ref,
-          })
-        }
+      for (const ref of extractUnresolvedDropRefs(mobDef?.Drops, itemIdsLower, droptableIdsLower)) {
+        const key = `${file.path}:${mobId}:${ref}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        issues.push({
+          type: 'missing_droptable_reference',
+          filePath: file.path,
+          entityId: mobId,
+          missingId: ref,
+        })
       }
     }
   }

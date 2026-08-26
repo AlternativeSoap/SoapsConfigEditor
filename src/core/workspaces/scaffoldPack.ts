@@ -128,6 +128,24 @@ export function scaffoldPack(kind: WorkspaceKind, options: ScaffoldOptions): Fil
           packName,
           'augments',
         ),
+        file(
+          `${base}/stats.yml`,
+          `# MythicCrucible custom stats for ${packName}.\n# Use New → New stat to add one.\n`,
+          packName,
+          'stats',
+        ),
+        file(
+          `${base}/lore-templates.yml`,
+          `# MythicCrucible lore templates for ${packName}.\n# Use New → New lore template to add one.\n`,
+          packName,
+          'lore-templates',
+        ),
+        file(
+          `${base}/placeholders.yml`,
+          `# MythicCrucible placeholders for ${packName}.\n# Use New → New placeholder to add one.\n`,
+          packName,
+          'placeholders',
+        ),
       )
     }
     return files

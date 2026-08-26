@@ -5,8 +5,8 @@ import {
   resolvePackRoot,
   suggestReagentPath,
   suggestStatsPath,
-  yamlHasTopLevelKey,
 } from '../../core/mythicrpg/generators'
+import { mergeWizardYaml } from '../../core/yaml/mergeWizardYaml'
 import { REAGENT_PRESETS } from '../../data/mythicrpg/presets'
 import type { FileRecord, ReagentGeneratorInput } from '../../types'
 import { ColorTextField } from '../ColorTextField'
@@ -43,24 +43,6 @@ interface ReagentWizardDialogProps {
   existingReagentIds: string[]
   onClose: () => void
   onApply: (output: ReagentWizardOutput) => void
-}
-
-function mergeYaml(
-  files: FileRecord[],
-  path: string,
-  yaml: string,
-  header: string,
-): { path: string; content: string; mode: 'create' | 'append' } | { error: string } {
-  const existing = files.find((f) => f.path.replace(/\\/g, '/') === path)
-  const key = yaml.split('\n')[0]?.replace(/:$/, '') ?? ''
-  if (existing && key && yamlHasTopLevelKey(existing.content, key)) {
-    return { error: `${key} already exists in ${path}. Pick another id or edit the existing entry.` }
-  }
-  if (!existing) {
-    return { path, content: `${header}\n${yaml}`, mode: 'create' }
-  }
-  const base = existing.content.trimEnd()
-  return { path, content: base ? `${base}\n\n${yaml}` : yaml, mode: 'create' }
 }
 
 export function ReagentWizardDialog({
@@ -123,7 +105,7 @@ export function ReagentWizardDialog({
       }
     }
     const path = (targetPath.trim() || suggestReagentPath(packRoot)).replace(/\\/g, '/')
-    const reagentWrite = mergeYaml(files, path, yaml, `# MythicRPG reagents\n`)
+    const reagentWrite = mergeWizardYaml(files, path, yaml, `# MythicRPG reagents\n`)
     if ('error' in reagentWrite) {
       setStep(0)
       setError(reagentWrite.error)
@@ -132,7 +114,7 @@ export function ReagentWizardDialog({
     const writes = [reagentWrite]
     if (input.scaleWithMaxMana || input.writeMaxManaStat) {
       const statsPath = suggestStatsPath(packRoot)
-      const statsWrite = mergeYaml(
+      const statsWrite = mergeWizardYaml(
         files,
         statsPath,
         generateMaxManaStatYaml(input.maxManaBase || 1000),

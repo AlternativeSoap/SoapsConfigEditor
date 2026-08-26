@@ -25,6 +25,9 @@ import type {
   SkillGeneratorInput,
 } from '../types'
 import { ColorTextField } from './ColorTextField'
+import { AutocompleteField } from './AutocompleteField'
+import { CatalogLineList } from './CatalogLineList'
+import { ConditionBlockList } from './ConditionBlockList'
 import {
   DialogBody,
   DialogFooter,
@@ -33,6 +36,7 @@ import {
   DialogPreviewBlock,
   DialogShell,
 } from './DialogShell'
+import { EnumChipList } from './EnumChipList'
 import { RemoveButton } from './RemoveButton'
 import { SkillLineBuilder } from './SkillLineBuilder'
 import { Switch } from './Switch'
@@ -40,10 +44,21 @@ import {
   MOB_OPTIONS,
   mobOptionByName,
 } from '../data/mythicmobs/mobOptions'
+import {
+  AI_GOAL_SELECTORS,
+  AI_TARGET_SELECTORS,
+} from '../data/mythicmobs/mobAiSelectors'
+import {
+  AI_GOAL_APPLY,
+  AI_GOAL_PARAM_HINTS,
+  AI_TARGET_APPLY,
+  AI_TARGET_PARAM_HINTS,
+} from '../data/mythicmobs/nestedEnums'
+import { BIOMES, ENTITY_TYPES } from '../core/mythicmobs/attrValueCompletions'
+import { searchMaterials } from '../data/minecraft/materials'
+import { EQUIPMENT_SLOTS } from '../data/mythicmobs/equipSlots'
 
-const EQUIPMENT_SLOTS = ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HAND', 'OFFHAND'] as const
-
-const EQUIPMENT_SLOT_META: { slot: typeof EQUIPMENT_SLOTS[number]; icon: string; label: string }[] = [
+const EQUIPMENT_SLOT_META: { slot: (typeof EQUIPMENT_SLOTS)[number]; icon: string; label: string }[] = [
   { slot: 'HEAD',    icon: '🪖', label: 'Head' },
   { slot: 'CHEST',  icon: '🧥', label: 'Chest' },
   { slot: 'LEGS',   icon: '👖', label: 'Legs' },
@@ -51,6 +66,23 @@ const EQUIPMENT_SLOT_META: { slot: typeof EQUIPMENT_SLOTS[number]; icon: string;
   { slot: 'HAND',   icon: '⚔️', label: 'Main Hand' },
   { slot: 'OFFHAND',icon: '🛡️', label: 'Off Hand' },
 ]
+
+function searchEntityTypes(query: string, limit = 12): string[] {
+  const q = query.trim().toLowerCase()
+  const list = !q
+    ? ENTITY_TYPES
+    : ENTITY_TYPES.filter((e) => e.toLowerCase().includes(q))
+  return list.slice(0, limit)
+}
+
+function searchMobOrEntityIds(mobIds: string[], query: string, limit = 12): string[] {
+  const q = query.trim().toLowerCase()
+  const combined = [...new Set([...mobIds, ...ENTITY_TYPES])]
+  const list = !q
+    ? combined
+    : combined.filter((id) => id.toLowerCase().includes(q))
+  return list.slice(0, limit)
+}
 
 type MythicCreateKind = Exclude<
   CreateKind,
@@ -67,6 +99,9 @@ type MythicCreateKind = Exclude<
   | 'augment-type'
   | 'crucible-item'
   | 'bag'
+  | 'crucible-stat'
+  | 'lore-template'
+  | 'placeholder'
 >
 
 interface CreateDialogProps {
@@ -330,10 +365,13 @@ export function CreateDialog({
                     }}
                   />
                 </label>
-                <label>
-                  Type
-                  <input value={mob.type} onChange={(e) => setMob({ ...mob, type: e.target.value })} placeholder="ZOMBIE" />
-                </label>
+                <AutocompleteField
+                  label="Type"
+                  value={mob.type}
+                  onChange={(type) => setMob({ ...mob, type })}
+                  search={searchEntityTypes}
+                  placeholder="ZOMBIE"
+                />
                 <ColorTextField
                   label="Display name"
                   value={mob.display}
@@ -543,26 +581,29 @@ export function CreateDialog({
 
             <DialogPanel title="AI selectors">
               <p className="dialog-note">
-                One selector per line. Start with clear when replacing vanilla AI.
+                Add goals and targets from the list. Start with clear when replacing vanilla AI.
+                Optional attributes go in the second field (for example factionName or {'{speed=1}'}).
               </p>
-              <label className="wide">
-                AIGoalSelectors
-                <textarea
-                  rows={3}
-                  value={mob.aiGoalSelectors}
-                  onChange={(e) => setMob({ ...mob, aiGoalSelectors: e.target.value })}
-                  placeholder={'clear\nmeleeattack\nrandomstroll'}
-                />
-              </label>
-              <label className="wide">
-                AITargetSelectors
-                <textarea
-                  rows={3}
-                  value={mob.aiTargetSelectors}
-                  onChange={(e) => setMob({ ...mob, aiTargetSelectors: e.target.value })}
-                  placeholder={'clear\nplayers'}
-                />
-              </label>
+              <CatalogLineList
+                label="AIGoalSelectors"
+                hint="What the mob does"
+                value={mob.aiGoalSelectors}
+                onChange={(aiGoalSelectors) => setMob({ ...mob, aiGoalSelectors })}
+                options={AI_GOAL_SELECTORS}
+                applyMap={AI_GOAL_APPLY}
+                paramHints={AI_GOAL_PARAM_HINTS}
+                addLabel="Add goal"
+              />
+              <CatalogLineList
+                label="AITargetSelectors"
+                hint="What the mob targets"
+                value={mob.aiTargetSelectors}
+                onChange={(aiTargetSelectors) => setMob({ ...mob, aiTargetSelectors })}
+                options={AI_TARGET_SELECTORS}
+                applyMap={AI_TARGET_APPLY}
+                paramHints={AI_TARGET_PARAM_HINTS}
+                addLabel="Add target"
+              />
             </DialogPanel>
 
 
@@ -610,10 +651,13 @@ export function CreateDialog({
                     }}
                   />
                 </label>
-                <label>
-                  Material
-                  <input value={item.material} onChange={(e) => setItem({ ...item, material: e.target.value })} />
-                </label>
+                <AutocompleteField
+                  label="Material"
+                  value={item.material}
+                  onChange={(material) => setItem({ ...item, material })}
+                  search={searchMaterials}
+                  placeholder="DIAMOND_SWORD"
+                />
                 <ColorTextField
                   label="Display name"
                   value={item.display}
@@ -659,15 +703,12 @@ export function CreateDialog({
                     onChange={(e) => setSkill({ ...skill, cooldown: Number(e.target.value) || 0 })}
                   />
                 </label>
-                <label className="wide">
-                  Conditions <span className="field-hint">One condition per row, e.g. health&#123;h=&gt;50&#125; true</span>
-                  <textarea
-                    rows={3}
+                <div className="wide">
+                  <ConditionBlockList
                     value={skill.conditions}
-                    onChange={(e) => setSkill({ ...skill, conditions: e.target.value })}
-                    placeholder="health{h=>50} true"
+                    onChange={(conditions) => setSkill({ ...skill, conditions })}
                   />
-                </label>
+                </div>
               </div>
             </DialogPanel>
 
@@ -852,18 +893,14 @@ export function CreateDialog({
                     <option value="DENY">DENY (prevent vanilla spawns)</option>
                   </select>
                 </label>
-                <label className="wide">
-                  Mob type
-                  <datalist id="spawn-mob-ids">
-                    {packIndex.mobIds.map((id) => <option key={id} value={id} />)}
-                  </datalist>
-                  <input
-                    list="spawn-mob-ids"
-                    value={spawn.mobType}
-                    onChange={(e) => setSpawn({ ...spawn, mobType: e.target.value })}
-                    placeholder="MY_MOB"
-                  />
-                </label>
+                <AutocompleteField
+                  label="Mob type"
+                  value={spawn.mobType}
+                  onChange={(mobType) => setSpawn({ ...spawn, mobType })}
+                  search={(q, limit) => searchMobOrEntityIds(packIndex.mobIds, q, limit)}
+                  placeholder="MY_MOB"
+                  uppercase={false}
+                />
                 <label>
                   Level <span className="field-hint">e.g. 1-5</span>
                   <input value={spawn.level} onChange={(e) => setSpawn({ ...spawn, level: e.target.value })} placeholder="1-5" />
@@ -879,18 +916,33 @@ export function CreateDialog({
                     onChange={(e) => setSpawn({ ...spawn, chance: Number(e.target.value) || 0.1 })}
                   />
                 </label>
-                <label className="wide">
-                  Worlds <span className="field-hint">Comma-separated</span>
-                  <input value={spawn.worlds} onChange={(e) => setSpawn({ ...spawn, worlds: e.target.value })} placeholder="world" />
-                </label>
-                <label className="wide">
-                  Biomes <span className="field-hint">Comma-separated, leave empty for all</span>
-                  <input value={spawn.biomes} onChange={(e) => setSpawn({ ...spawn, biomes: e.target.value })} placeholder="FOREST, PLAINS" />
-                </label>
-                <label className="wide">
-                  Conditions <span className="field-hint">One per row</span>
-                  <textarea rows={3} value={spawn.conditions} onChange={(e) => setSpawn({ ...spawn, conditions: e.target.value })} />
-                </label>
+                <div className="wide">
+                  <EnumChipList
+                    label="Worlds"
+                    hint="Leave empty for all worlds"
+                    value={spawn.worlds}
+                    onChange={(worlds) => setSpawn({ ...spawn, worlds })}
+                    options={['world', 'world_nether', 'world_the_end']}
+                    placeholder="Add world…"
+                    uppercase={false}
+                  />
+                </div>
+                <div className="wide">
+                  <EnumChipList
+                    label="Biomes"
+                    hint="Leave empty for all biomes"
+                    value={spawn.biomes}
+                    onChange={(biomes) => setSpawn({ ...spawn, biomes })}
+                    options={BIOMES}
+                    placeholder="Add biome…"
+                  />
+                </div>
+                <div className="wide">
+                  <ConditionBlockList
+                    value={spawn.conditions}
+                    onChange={(conditions) => setSpawn({ ...spawn, conditions })}
+                  />
+                </div>
               </div>
             </DialogPanel>
           </DialogBody>

@@ -28,6 +28,9 @@ const MYTHIC_CRUCIBLE_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'augment-type', label: 'New augment type' },
   { kind: 'crucible-item', label: 'New Crucible item' },
   { kind: 'bag', label: 'New bag' },
+  { kind: 'crucible-stat', label: 'New stat' },
+  { kind: 'lore-template', label: 'New lore template' },
+  { kind: 'placeholder', label: 'New placeholder' },
 ]
 
 const MMOCORE_ITEMS: { kind: CreateKind; label: string }[] = [

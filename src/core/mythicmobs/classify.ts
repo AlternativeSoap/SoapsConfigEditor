@@ -26,6 +26,12 @@ export function classifyMythicCategory(filePath: string): MythicCategory {
   if (baseName === 'augments.yml' || baseName.startsWith('augments.')) {
     return 'augments'
   }
+  if (baseName === 'lore-templates.yml' || baseName.startsWith('lore-templates.')) {
+    return 'lore-templates'
+  }
+  if (baseName === 'placeholders.yml' || baseName.startsWith('placeholders.')) {
+    return 'placeholders'
+  }
   if (baseName === 'stats.yml' || baseName.endsWith('.stat.yml')) {
     return 'stats'
   }

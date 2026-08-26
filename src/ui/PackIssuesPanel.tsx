@@ -12,7 +12,7 @@ interface PackIssuesPanelProps {
 
 const TYPE_LABEL: Record<ValidationIssue['type'], string> = {
   missing_skill_reference: 'Missing skill',
-  missing_droptable_reference: 'Missing drop table',
+  missing_droptable_reference: 'Unresolved drop',
   missing_spawn_mob_reference: 'Missing mob',
   missing_equipment_set_reference: 'Missing equipment set',
   missing_augment_type_reference: 'Missing augment type',
@@ -29,7 +29,7 @@ export function PackIssuesPanel({ files, onNavigate, onApplyPatches }: PackIssue
   if (!showIssues && !showHints) {
     return (
       <div className="dep-panel">
-        <p className="dep-empty">No missing skill, drop table, spawn mob, equipment set, or augment type references.</p>
+        <p className="dep-empty">No missing skill, drop, spawn mob, equipment set, or augment type references.</p>
       </div>
     )
   }

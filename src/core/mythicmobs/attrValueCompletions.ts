@@ -1,9 +1,20 @@
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { COMMON_MATERIALS } from '../../data/mmocore/materials'
-import { MINECRAFT_SOUND_KEYS } from '../../data/mythicmobs/soundKeys'
+import { AUDIENCE_TARGETER_STARTERS, AUDIENCE_VALUES } from '../../data/mythicmobs/audienceTypes'
+import { EQUIPMENT_SLOT_COMPLETIONS, EQUIPMENT_SLOTS } from '../../data/mythicmobs/equipSlots'
 import type { MechanicAttr } from '../../data/mythicmobs/mechanics'
+import {
+  isDustOptionsParticle,
+  PARTICLE_FAMILY_ATTRS,
+  PARTICLE_HEX_COLORS,
+  PARTICLE_TYPES,
+} from '../../data/mythicmobs/particleTypes'
+import { MINECRAFT_SOUND_KEYS } from '../../data/mythicmobs/soundKeys'
 import { DROPTABLE_ATTRS, ITEM_ATTRS, SKILL_REF_ATTRS, SLOT_ATTRS } from './attrRegistry'
-import { EQUIPMENT_SLOTS } from './yamlEditContext'
+import { parseAttrNames } from './skillLineAttrs'
+
+export { PARTICLE_TYPES } from '../../data/mythicmobs/particleTypes'
+export { EQUIPMENT_SLOTS }
 
 export const BOOLEAN_VALUES = ['true', 'false']
 
@@ -14,17 +25,6 @@ export const POTION_EFFECTS = [
   'HEALTH_BOOST', 'ABSORPTION', 'SATURATION', 'GLOWING', 'LEVITATION', 'LUCK', 'UNLUCK',
   'SLOW_FALLING', 'CONDUIT_POWER', 'DOLPHINS_GRACE', 'BAD_OMEN', 'HERO_OF_THE_VILLAGE',
   'DARKNESS', 'NAUSEA', 'INSTANT_DAMAGE', 'INSTANT_HEALTH', 'MINING_FATIGUE', 'STRENGTH',
-]
-
-export const PARTICLE_TYPES = [
-  'FLAME', 'SMOKE', 'LARGE_SMOKE', 'CLOUD', 'REDSTONE', 'SPELL_WITCH', 'ENCHANTMENT_TABLE',
-  'CRIT', 'MAGIC_CRIT', 'SPELL', 'INSTANT_SPELL', 'MOB_SPELL', 'MOB_SPELL_AMBIENT', 'WITCH',
-  'EXPLOSION', 'HEART', 'NOTE', 'PORTAL', 'FIREWORKS_SPARK', 'VILLAGER_HAPPY', 'VILLAGER_ANGRY',
-  'DRIP_WATER', 'DRIP_LAVA', 'SNOWBALL', 'SLIME', 'BUBBLE', 'SPLASH', 'FISHING', 'RAIN',
-  'ITEM_SNOWBALL', 'BLOCK_DUST', 'FALLING_DUST', 'TOTEM', 'SOUL', 'SOUL_FIRE_FLAME',
-  'SCRAPE', 'WAX_ON', 'WAX_OFF', 'ELECTRIC_SPARK', 'DRAGON_BREATH', 'END_ROD', 'TOTEM_OF_UNDYING',
-  'COMPOSTER', 'SPORE_BLOSSOM_AIR', 'SPORE_BLOSSOM', 'GLOW', 'GLOW_SQUID_INK', 'SCULK_SOUL',
-  'SCULK_CHARGE', 'SHRIEK', 'CHERRY_LEAVES', 'DECORATED_POT', 'EGG_CRACK',
 ]
 
 export const DAMAGE_CAUSES = [
@@ -113,6 +113,12 @@ export const PLACEHOLDERS = [
 ]
 
 export const TIMER_TICK_PRESETS = ['20', '40', '60', '100', '200', '400', '600', '1200']
+
+/** Common color attr names for dust hex completions. */
+const HEX_COLOR_ATTRS = new Set(['color', 'c', 'color2', 'c2'])
+
+export type AttrValueOption = { label: string; apply?: string; detail?: string }
+
 export function enumOptionsFromDesc(desc?: string, defaultVal?: string): string[] {
   if (!desc) return defaultVal ? [defaultVal] : []
 
@@ -139,6 +145,107 @@ function effectiveAttrType(attr: MechanicAttr): MechanicAttr['type'] {
   return attr.type
 }
 
+export function isParticleFamilyBlock(blockId: string): boolean {
+  const b = blockId.toLowerCase()
+  return b.includes('particle') || b === 'atom'
+}
+
+/** Parse `key=value` pairs from an open brace interior (incomplete trailing ok). */
+export function parseBraceAttrMap(inside: string): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const part of inside.split(';')) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+    const eq = trimmed.indexOf('=')
+    if (eq < 0) continue
+    const key = trimmed.slice(0, eq).trim().toLowerCase()
+    const value = trimmed.slice(eq + 1).trim()
+    if (key) map.set(key, value)
+  }
+  return map
+}
+
+export function currentParticleFromInside(inside: string): string | null {
+  const map = parseBraceAttrMap(inside)
+  const raw = map.get('particle') ?? map.get('type')
+  if (!raw) return null
+  const token = raw.split(/[\s,]/)[0]?.trim()
+  return token || null
+}
+
+function mergeAttrLists(base: MechanicAttr[], extra: MechanicAttr[]): MechanicAttr[] {
+  const byName = new Map<string, MechanicAttr>()
+  for (const a of base) byName.set(a.name.toLowerCase(), a)
+  for (const a of extra) {
+    if (!byName.has(a.name.toLowerCase())) byName.set(a.name.toLowerCase(), a)
+  }
+  return [...byName.values()]
+}
+
+/** Inject shared particle-family attrs for brace name/value AC. */
+export function augmentBraceAttrs(attrs: MechanicAttr[], blockId: string): MechanicAttr[] {
+  if (!isParticleFamilyBlock(blockId)) return attrs
+  return mergeAttrLists(attrs, PARTICLE_FAMILY_ATTRS)
+}
+
+function syntheticAttr(attrName: string, blockId: string): MechanicAttr | null {
+  const name = attrName.toLowerCase()
+  if (name === 'particle') return { name: 'particle', type: 'enum', default: 'FLAME' }
+  if (name === 'audience') return { name: 'audience', type: 'enum', default: 'tracked' }
+  if (SLOT_ATTRS.has(name)) return { name: 'slot', type: 'enum', default: 'HEAD' }
+  if (HEX_COLOR_ATTRS.has(name)) return { name: attrName, type: 'string', default: '#FF0000' }
+  if (name === 'size') return { name: 'size', type: 'number', default: '1' }
+  if (name === 'type' && isParticleFamilyBlock(blockId)) {
+    return { name: 'type', type: 'enum', default: 'FLAME' }
+  }
+  if (name === 'material' && isParticleFamilyBlock(blockId)) {
+    return { name: 'material', type: 'string', default: 'STONE' }
+  }
+  return null
+}
+
+function resolveAttr(
+  attrs: MechanicAttr[],
+  attrName: string,
+  blockId: string,
+): MechanicAttr | null {
+  const found = attrs.find((a) => a.name.toLowerCase() === attrName.toLowerCase())
+  if (found) return found
+  return syntheticAttr(attrName, blockId)
+}
+
+function usesHexParticleColor(inside: string, blockId: string): boolean {
+  if (!isParticleFamilyBlock(blockId)) return false
+  const particle = currentParticleFromInside(inside)
+  return particle ? isDustOptionsParticle(particle) : false
+}
+
+function particleValueApply(particle: string, inside: string): string | undefined {
+  const present = parseAttrNames(inside)
+  const upper = particle.toUpperCase()
+  if (upper === 'DUST') {
+    if (present.has('color') || present.has('c')) return undefined
+    return 'DUST;color=#FF0000'
+  }
+  if (upper === 'DUST_COLOR_TRANSITION') {
+    let apply = 'DUST_COLOR_TRANSITION'
+    if (!present.has('color') && !present.has('c')) apply += ';color=#FF0000'
+    if (!present.has('color2') && !present.has('c2')) apply += ';color2=#0000FF'
+    return apply === 'DUST_COLOR_TRANSITION' ? undefined : apply
+  }
+  return undefined
+}
+
+function matchesTyped(label: string, typed: string): boolean {
+  if (!typed) return true
+  return label.toLowerCase().startsWith(typed.toLowerCase())
+}
+
+function audienceOptions(typed: string): AttrValueOption[] {
+  const source = typed.startsWith('@') ? AUDIENCE_TARGETER_STARTERS : AUDIENCE_VALUES
+  return source.filter((v) => matchesTyped(v, typed)).map((label) => ({ label }))
+}
+
 export function valuesForAttr(
   blockId: string,
   attr: MechanicAttr,
@@ -146,6 +253,7 @@ export function valuesForAttr(
   packMobIds: string[],
   packItemIds: string[] = [],
   packDroptableIds: string[] = [],
+  braceInside = '',
 ): string[] {
   const type = effectiveAttrType(attr)
   const name = attr.name.toLowerCase()
@@ -158,14 +266,14 @@ export function valuesForAttr(
 
   if (type === 'boolean') return BOOLEAN_VALUES
 
-  if (type === 'enum') {
-    const fromDesc = enumOptionsFromDesc(attr.desc, attr.default)
-    if (fromDesc.length) return fromDesc
-  }
-
+  // Named catalogs before generic enum-from-desc (avoids default-only results like particle → [FLAME]).
   if (name === 'damagecause' || name === 'cause') return DAMAGE_CAUSES
   if (name === 'sound') return [...MINECRAFT_SOUND_KEYS]
-  if (name === 'particle') return PARTICLE_TYPES
+  if (name === 'particle') return [...PARTICLE_TYPES]
+  if (name === 'audience') return [...AUDIENCE_VALUES]
+  if (HEX_COLOR_ATTRS.has(name) && usesHexParticleColor(braceInside, blockId)) {
+    return [...PARTICLE_HEX_COLORS]
+  }
   if (name === 'color') return TEAM_COLORS
   if (name === 'biome') return BIOMES
   if (name === 'reason') return SPAWN_REASONS
@@ -174,6 +282,11 @@ export function valuesForAttr(
   if (name === 'enchantment') return ENCHANTMENTS
   if (name === 'operator') return COMPARE_OPERATORS
   if (name === 'action') return RANDOMSPAWN_ACTIONS
+
+  if (type === 'enum') {
+    const fromDesc = enumOptionsFromDesc(attr.desc, attr.default)
+    if (fromDesc.length) return fromDesc
+  }
 
   if (name === 'type') {
     if (block === 'potion' || block === 'summonareaeffectcloud' || block === 'potionclear') {
@@ -185,7 +298,7 @@ export function valuesForAttr(
       return packMobIds.length ? packMobIds : ENTITY_TYPES
     }
     if (block === 'neareststructure') return STRUCTURE_TYPES
-    if (block.includes('particle')) return PARTICLE_TYPES
+    if (block.includes('particle') || block === 'atom') return [...PARTICLE_TYPES]
     if (block === 'summon' || block === 'mount' || block === 'summonpassenger') {
       return [...new Set([...ENTITY_TYPES, ...packMobIds])]
     }
@@ -201,6 +314,57 @@ export function valuesForAttr(
   if (attr.default) return [attr.default]
 
   return []
+}
+
+/** Rich options for brace value AC (supports apply / detail). */
+export function optionsForAttr(
+  blockId: string,
+  attr: MechanicAttr,
+  packSkillIds: string[],
+  packMobIds: string[],
+  packItemIds: string[] = [],
+  packDroptableIds: string[] = [],
+  braceInside = '',
+  typed = '',
+): AttrValueOption[] {
+  const name = attr.name.toLowerCase()
+
+  if (SLOT_ATTRS.has(name)) {
+    return EQUIPMENT_SLOT_COMPLETIONS.filter((o) => matchesTyped(o.label, typed))
+  }
+
+  if (name === 'audience') {
+    return audienceOptions(typed)
+  }
+
+  if (name === 'particle' || (name === 'type' && isParticleFamilyBlock(blockId))) {
+    return PARTICLE_TYPES.filter((p) => matchesTyped(p, typed)).map((p) => {
+      const apply = particleValueApply(p, braceInside)
+      return {
+        label: p,
+        ...(apply ? { apply } : {}),
+        ...(isDustOptionsParticle(p) ? { detail: 'requires color hex' } : {}),
+      }
+    })
+  }
+
+  if (HEX_COLOR_ATTRS.has(name) && usesHexParticleColor(braceInside, blockId)) {
+    return PARTICLE_HEX_COLORS.filter((c) => matchesTyped(c, typed)).map((label) => ({ label }))
+  }
+
+  const values = valuesForAttr(
+    blockId,
+    attr,
+    packSkillIds,
+    packMobIds,
+    packItemIds,
+    packDroptableIds,
+    braceInside,
+  )
+  return values.filter((v) => matchesTyped(v, typed)).map((label) => ({
+    label,
+    detail: effectiveAttrType(attr),
+  }))
 }
 
 export function buildBraceAttrValueCompletions(
@@ -223,23 +387,28 @@ export function buildBraceAttrValueCompletions(
     typed = typed.split(',').pop()?.trim() ?? typed
   }
 
-  const attr = attrs.find((a) => a.name.toLowerCase() === attrName.toLowerCase())
+  const attr = resolveAttr(attrs, attrName, blockId)
   if (!attr) return null
 
-  const values = valuesForAttr(blockId, attr, packSkillIds, packMobIds, packItemIds, packDroptableIds)
-  if (values.length === 0) return null
-
-  const filtered = values.filter(
-    (v) => !typed || v.toLowerCase().startsWith(typed.toLowerCase()),
+  const options = optionsForAttr(
+    blockId,
+    attr,
+    packSkillIds,
+    packMobIds,
+    packItemIds,
+    packDroptableIds,
+    inside,
+    typed,
   )
-  if (filtered.length === 0) return null
+  if (options.length === 0) return null
 
   const from = context.pos - typed.length
-  const options: Completion[] = filtered.map((v) => ({
-    label: v,
+  const completions: Completion[] = options.map((o) => ({
+    label: o.label,
     type: 'enum',
-    detail: effectiveAttrType(attr),
+    detail: o.detail,
+    ...(o.apply ? { apply: o.apply } : {}),
   }))
 
-  return { from, options, validFor: /^[^;,]*$/ }
+  return { from, options: completions, validFor: /^[^;,]*$/ }
 }

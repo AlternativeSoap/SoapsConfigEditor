@@ -4,13 +4,14 @@ import {
   resolvePackRoot,
   suggestEquipmentSetPath,
 } from '../../core/mythiccrucible/generators'
-import { yamlHasTopLevelKey } from '../../core/mythicrpg/generators'
+import { mergeWizardYaml } from '../../core/yaml/mergeWizardYaml'
 import { EQUIPMENT_SET_PRESETS } from '../../data/mythiccrucible/presets'
 import type { EquipmentSetBonusInput, EquipmentSetGeneratorInput, FileRecord } from '../../types'
 import { ColorTextField } from '../ColorTextField'
 import { SkillLineBuilder } from '../SkillLineBuilder'
 import { Switch } from '../Switch'
 import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
+import { CrucibleStatsEditor } from './CrucibleStatsEditor'
 
 const STEPS = ['Identity', 'Bonuses'] as const
 
@@ -38,28 +39,9 @@ interface EquipmentSetWizardDialogProps {
   packName: string
   existingSetIds: string[]
   crucibleEnabled: boolean
+  packStatIds?: string[]
   onClose: () => void
   onApply: (output: EquipmentSetWizardOutput) => void
-}
-
-function mergeYaml(
-  files: FileRecord[],
-  path: string,
-  yaml: string,
-  header: string,
-): { path: string; content: string; mode: 'create' | 'append' } | { error: string } {
-  const existing = files.find((f) => f.path.replace(/\\/g, '/') === path)
-  const key = yaml.split('\n')[0]?.replace(/:$/, '') ?? ''
-  if (existing && key && yamlHasTopLevelKey(existing.content, key)) {
-    return {
-      error: `${key} already exists in ${path}. Pick another id or edit the existing entry.`,
-    }
-  }
-  if (!existing) {
-    return { path, content: `${header}\n${yaml}`, mode: 'create' }
-  }
-  const base = existing.content.trimEnd()
-  return { path, content: base ? `${base}\n\n${yaml}` : yaml, mode: 'create' }
 }
 
 export function EquipmentSetWizardDialog({
@@ -67,6 +49,7 @@ export function EquipmentSetWizardDialog({
   packName,
   existingSetIds,
   crucibleEnabled,
+  packStatIds = [],
   onClose,
   onApply,
 }: EquipmentSetWizardDialogProps) {
@@ -116,7 +99,7 @@ export function EquipmentSetWizardDialog({
 
   function handleCreate(): void {
     if (!validate()) return
-    const entry = mergeYaml(
+    const entry = mergeWizardYaml(
       files,
       targetPath,
       yaml,
@@ -222,14 +205,15 @@ export function EquipmentSetWizardDialog({
                       onChange={(e) => patchBonus(index, { pieces: Number(e.target.value) || 1 })}
                     />
                   </label>
-                  <label className="wide">
-                    Stats <span className="field-hint">One per line, e.g. DEFENSE 10 ADDITIVE</span>
-                    <textarea
-                      rows={2}
+                  <div className="wide">
+                    <span className="wz-field-label">Stats</span>
+                    <p className="dialog-note">Search for a stat, click to add it, then set the value.</p>
+                    <CrucibleStatsEditor
                       value={bonus.stats}
-                      onChange={(e) => patchBonus(index, { stats: e.target.value })}
+                      onChange={(stats) => patchBonus(index, { stats })}
+                      packStatIds={packStatIds}
                     />
-                  </label>
+                  </div>
                   <label className="wide">
                     Skills <span className="field-hint">One skill line per row</span>
                     <textarea

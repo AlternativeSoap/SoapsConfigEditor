@@ -101,6 +101,9 @@ import { EMPTY_CONTEXT, type SkillLineContext } from './core/mythicmobs/skillLin
 import { EquipmentSetWizardDialog } from './ui/mythiccrucible/EquipmentSetWizardDialog'
 import { AugmentTypeWizardDialog } from './ui/mythiccrucible/AugmentTypeWizardDialog'
 import { CrucibleItemWizardDialog } from './ui/mythiccrucible/CrucibleItemWizardDialog'
+import { CrucibleStatWizardDialog } from './ui/mythiccrucible/CrucibleStatWizardDialog'
+import { LoreTemplateWizardDialog } from './ui/mythiccrucible/LoreTemplateWizardDialog'
+import { PlaceholderWizardDialog } from './ui/mythiccrucible/PlaceholderWizardDialog'
 
 function fileIdsForCategory(category: MythicCategory, content: string): string[] {
   if (category === 'exp-curves') return []
@@ -405,6 +408,8 @@ function App() {
     archetypeIds: effectiveFiles.filter((f) => f.category === 'archetypes').flatMap((f) => f.ids),
     equipmentSetIds: effectiveFiles.filter((f) => f.category === 'equipment-sets').flatMap((f) => f.ids),
     augmentTypeIds: effectiveFiles.filter((f) => f.category === 'augments').flatMap((f) => f.ids),
+    loreTemplateIds: effectiveFiles.filter((f) => f.category === 'lore-templates').flatMap((f) => f.ids),
+    statIds: effectiveFiles.filter((f) => f.category === 'stats').flatMap((f) => f.ids),
   }), [effectiveFiles])
 
   const mmocoreIndex = useMemo(() => indexMMOCorePack(effectiveFiles), [effectiveFiles])
@@ -608,7 +613,12 @@ function App() {
         (f) => f.category === 'reagents' || f.category === 'archetypes',
       )
       const hasCrucibleContent = mapped.some(
-        (f) => f.category === 'equipment-sets' || f.category === 'augments',
+        (f) =>
+          f.category === 'equipment-sets' ||
+          f.category === 'augments' ||
+          f.category === 'lore-templates' ||
+          f.category === 'placeholders' ||
+          f.category === 'stats',
       )
       const addonPatch: Partial<MythicAddons> = {}
       if (workspaceId === 'mythicmobs' && hasRpgContent && !mythicAddons.mythicrpg) {
@@ -1300,7 +1310,10 @@ function App() {
       kind === 'equipment-set' ||
       kind === 'augment-type' ||
       kind === 'crucible-item' ||
-      kind === 'bag'
+      kind === 'bag' ||
+      kind === 'crucible-stat' ||
+      kind === 'lore-template' ||
+      kind === 'placeholder'
     ) {
       return activePath
     }
@@ -1922,7 +1935,10 @@ function App() {
       createKind !== 'equipment-set' &&
       createKind !== 'augment-type' &&
       createKind !== 'crucible-item' &&
-      createKind !== 'bag' ? (
+      createKind !== 'bag' &&
+      createKind !== 'crucible-stat' &&
+      createKind !== 'lore-template' &&
+      createKind !== 'placeholder' ? (
         <CreateDialog
           kind={createKind}
           files={files}
@@ -1975,6 +1991,7 @@ function App() {
           packName={mythicPackName}
           existingSetIds={packIndex.equipmentSetIds}
           crucibleEnabled={crucibleEnabled}
+          packStatIds={packIndex.statIds}
           onClose={() => setCreateKind(null)}
           onApply={(out) => {
             void applyMultiFileWrite(out.files)
@@ -2003,6 +2020,8 @@ function App() {
           existingItemIds={packIndex.itemIds}
           equipmentSetIds={packIndex.equipmentSetIds}
           augmentTypeIds={packIndex.augmentTypeIds}
+          loreTemplateIds={packIndex.loreTemplateIds}
+          packStatIds={packIndex.statIds}
           crucibleEnabled={crucibleEnabled}
           initialAsBag={createKind === 'bag'}
           onClose={() => setCreateKind(null)}
@@ -2014,6 +2033,47 @@ function App() {
                 ? 'Bag added. Save the file to keep it.'
                 : 'Crucible item added. Save the file to keep it.',
             )
+          }}
+        />
+      ) : null}
+      {createKind === 'crucible-stat' && crucibleEnabled ? (
+        <CrucibleStatWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingStatIds={packIndex.statIds}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Stat added. Save the file to keep it.')
+          }}
+        />
+      ) : null}
+      {createKind === 'lore-template' && crucibleEnabled ? (
+        <LoreTemplateWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingIds={packIndex.loreTemplateIds}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Lore template added. Save the file to keep it.')
+          }}
+        />
+      ) : null}
+      {createKind === 'placeholder' && crucibleEnabled ? (
+        <PlaceholderWizardDialog
+          files={effectiveFiles}
+          packName={mythicPackName}
+          existingIds={effectiveFiles
+            .filter((f) => f.category === 'placeholders')
+            .flatMap((f) => f.ids)}
+          onClose={() => setCreateKind(null)}
+          onApply={(out) => {
+            void applyMultiFileWrite(out.files)
+            setCreateKind(null)
+            setStatusMessage('Placeholder added. Save the file to keep it.')
           }}
         />
       ) : null}

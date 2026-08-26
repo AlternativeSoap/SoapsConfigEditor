@@ -230,7 +230,7 @@ export const DROPTABLE_BODY_KEYS = defsToKeys(DROPTABLE_BODY_DEFS)
 /** @deprecated Prefer RANDOMSPAWN_BODY_DEFS */
 export const RANDOMSPAWN_BODY_KEYS = defsToKeys(RANDOMSPAWN_BODY_DEFS)
 
-export const EQUIPMENT_SLOTS = ['HEAD', 'CHEST', 'LEGS', 'FEET', 'HAND', 'OFFHAND']
+export { EQUIPMENT_SLOTS } from '../../data/mythicmobs/equipSlots'
 
 export const DROP_BUILTINS = ['exp', 'money', 'command', 'nothing', 'mcmmo-exp'] as const
 

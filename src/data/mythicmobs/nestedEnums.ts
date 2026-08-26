@@ -80,11 +80,21 @@ export const RANDOMSPAWN_POSITION_TYPES = ['LAND', 'SEA'] as const
 /** Common AI goal selector apply snippets (params vary; these are starters). */
 export const AI_GOAL_APPLY: Record<string, string> = {
   clear: 'clear',
-  meleeattack: 'meleeattack{speed=1}',
+  meleeattack: 'meleeattack',
   lookatplayers: 'lookatplayers',
   randomstroll: 'randomstroll',
   bowshoot: 'bowshoot',
   flee: 'flee',
+  fleefaction: 'fleefaction',
+  gotospawn: 'gotospawn',
+}
+
+/** Optional params hint shown in the New mob AI list. */
+export const AI_GOAL_PARAM_HINTS: Record<string, string> = {
+  fleefaction: 'factionName',
+  gotospawn: '{speed=1}',
+  fleeConditional: '{safeSpeed=1;distance=8}',
+  movetoblock: 'STONE',
 }
 
 /** Common AI target selector apply snippets. */
@@ -93,4 +103,11 @@ export const AI_TARGET_APPLY: Record<string, string> = {
   players: 'players',
   attacker: 'attacker',
   nearestplayer: 'nearestplayer',
+  specificfaction: 'specificfaction',
+  otherfaction: 'otherfaction',
+}
+
+export const AI_TARGET_PARAM_HINTS: Record<string, string> = {
+  specificfaction: 'factionName',
+  otherfaction: 'factionName',
 }

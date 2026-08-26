@@ -2,12 +2,19 @@ import { describe, expect, it } from 'vitest'
 import {
   generateAugmentTypeYaml,
   generateCrucibleItemYaml,
+  generateCrucibleStatYaml,
   generateEquipmentSetYaml,
+  generateLoreTemplateYaml,
+  generatePlaceholderYaml,
 } from './generators'
 import {
   AUGMENT_TYPE_PRESETS,
   CRUCIBLE_ITEM_PRESETS,
+  CRUCIBLE_STAT_PRESETS,
+  emptyCrucibleItem,
   EQUIPMENT_SET_PRESETS,
+  LORE_TEMPLATE_PRESETS,
+  PLACEHOLDER_PRESETS,
 } from '../../data/mythiccrucible/presets'
 import { CRUCIBLE_MECHANICS } from '../../data/mythiccrucible/mechanics'
 import { CRUCIBLE_TRIGGERS } from '../../data/mythiccrucible/triggers'
@@ -64,24 +71,167 @@ describe('mythiccrucible generators', () => {
     expect(yaml).toContain('Type: SPARK_GEM')
   })
 
-  it('generates a consumable with onUse skills', () => {
+  it('emits a single augment slot as object form', () => {
+    const yaml = generateCrucibleItemYaml({
+      ...emptyCrucibleItem(),
+      id: 'ONE_SLOT',
+      augmentSlots: [{ type: 'SPARK_GEM', amount: '2', chance: '0.5', maxAmount: '3' }],
+    })
+    expect(yaml).toContain('AugmentationSlots:')
+    expect(yaml).toContain('    Type: SPARK_GEM')
+    expect(yaml).toContain('    Amount: 2')
+    expect(yaml).toContain('    Chance: 0.5')
+    expect(yaml).toContain('    MaxAmount: 3')
+    expect(yaml).not.toContain('- Type:')
+  })
+
+  it('emits multiple augment slots as list form', () => {
+    const yaml = generateCrucibleItemYaml({
+      ...emptyCrucibleItem(),
+      id: 'MULTI_SLOT',
+      augmentSlots: [
+        { type: 'SPARK_GEM', amount: '1', chance: '1', maxAmount: '' },
+        { type: 'VOID_GEM', amount: '2', chance: '1', maxAmount: '' },
+      ],
+    })
+    expect(yaml).toContain('- Type: SPARK_GEM')
+    expect(yaml).toContain('- Type: VOID_GEM')
+  })
+
+  it('generates upgrades with equations and descriptions', () => {
+    const yaml = generateCrucibleItemYaml({
+      ...emptyCrucibleItem(),
+      id: 'LEVELED',
+      defaultLevel: '1',
+      maxLevel: '10',
+      setEquipLevel: true,
+      defaultLevelDescription: '<gray>Level <level>',
+      defaultUpgradeDescription: '<yellow>Upgrade available',
+      levelDescriptions: [{ level: '5', text: '<gold>Mid tier' }],
+      upgradeDescriptions: [{ level: '10', text: '<aqua>Maxed' }],
+      upgradeEquations: 'ATTACK_DAMAGE ADDITIVE v*(1+0.05*l)',
+    })
+    expect(yaml).toContain('Upgrades:')
+    expect(yaml).toContain('DefaultLevel: 1')
+    expect(yaml).toContain('MaxLevel: 10')
+    expect(yaml).toContain('SetEquipLevel: true')
+    expect(yaml).toContain('DefaultLevelDescription:')
+    expect(yaml).toContain('LevelDescription:')
+    expect(yaml).toContain('UpgradeDescription:')
+    expect(yaml).toContain('Equations:')
+    expect(yaml).toContain('ATTACK_DAMAGE ADDITIVE v*(1+0.05*l)')
+  })
+
+  it('generates FURNACE recipes and SHAPED leftovers', () => {
+    const furnace = generateCrucibleItemYaml({
+      ...emptyCrucibleItem(),
+      id: 'COOKED',
+      recipeType: 'FURNACE',
+      recipeIngredient: 'RAW_BEEF',
+      recipeCookingTime: '200',
+      recipeExperience: '0.35',
+    })
+    expect(furnace).toContain('Type: FURNACE')
+    expect(furnace).toContain('Ingredient: RAW_BEEF')
+    expect(furnace).toContain('CookingTime: 200')
+    expect(furnace).toContain('Experience: 0.35')
+
+    const shaped = generateCrucibleItemYaml({
+      ...emptyCrucibleItem(),
+      id: 'CRAFTED',
+      recipeType: 'SHAPED',
+      recipeIngredients: 'iron_ingot | air\nair | stick',
+      recipeLeftover: 'bucket',
+      recipeCraftSkills: 'message{m=Crafted!} @self',
+    })
+    expect(shaped).toContain('IngredientsLeftover:')
+    expect(shaped).toContain('- bucket')
+    expect(shaped).toContain('CraftSkills:')
+  })
+
+  it('generates consumable Potion and Food YAML', () => {
     const yaml = generateCrucibleItemYaml(
       CRUCIBLE_ITEM_PRESETS.find((p) => p.id === 'consumable')!.apply(),
     )
+    expect(yaml).toContain('Potion:')
+    expect(yaml).toContain('Type: REGENERATION')
+    expect(yaml).toContain('Food:')
+    expect(yaml).toContain('Nutrition:')
     expect(yaml).toContain('~onUse')
-    expect(yaml).toContain('consumeuseditem')
-    expect(yaml).not.toContain('- -')
-    expect(yaml).toContain('  - skill{s=[')
-    expect(yaml).toContain('    - potion{type=REGEN;duration=100;level=1}')
-    expect(yaml).toContain('    - consumeuseditem{amount=1} @self')
-    expect(yaml).toContain('    ]} @self ~onUse')
+  })
+
+  it('generates bag Inventory sounds and NearlyFull', () => {
+    const yaml = generateCrucibleItemYaml({
+      ...emptyCrucibleItem(true),
+      bagSoundOpen: 'block.chest.open',
+      bagSoundClose: 'block.chest.close',
+      bagSoundVolume: '1',
+      bagNearlyFullEnabled: true,
+      bagNearlyFullThreshold: '2',
+      bagNearlyFullMessage: '<yellow>{slots} left',
+      bagBlacklist: 'BEDROCK\nBARRIER',
+    })
+    expect(yaml).toContain('Sounds:')
+    expect(yaml).toContain('Open:')
+    expect(yaml).toContain('NearlyFull:')
+    expect(yaml).toContain('Threshold: 2')
+    expect(yaml).toContain('BlacklistedItems:')
+    expect(yaml).toContain('- BEDROCK')
+  })
+
+  it('generates a custom stat', () => {
+    const yaml = generateCrucibleStatYaml(CRUCIBLE_STAT_PRESETS[0]!.apply())
+    expect(yaml).toContain('FOCUS:')
+    expect(yaml).toContain('BaseValue: 0')
+    expect(yaml).toContain('Formatting:')
+    expect(yaml).toContain('Enabled: true')
+  })
+
+  it('generates a lore template', () => {
+    const yaml = generateLoreTemplateYaml(LORE_TEMPLATE_PRESETS[0]!.apply())
+    expect(yaml).toContain('WeaponStats:')
+    expect(yaml).toContain('Lines:')
+    expect(yaml).toContain('{stats}')
+  })
+
+  it('generates placeholder kinds', () => {
+    const simple = generatePlaceholderYaml(PLACEHOLDER_PRESETS[0]!.apply())
+    expect(simple).toContain('BrandColor:')
+
+    const random = generatePlaceholderYaml({
+      id: 'Colors',
+      kind: 'random',
+      value: '',
+      randomValues: 'red\nblue',
+      dayValue: '',
+      nightValue: '',
+      defaultValue: '',
+    })
+    expect(random).toContain('- "red"')
+    expect(random).toContain('- "blue"')
+
+    const conditional = generatePlaceholderYaml({
+      id: 'TimeGreeting',
+      kind: 'conditional',
+      value: '',
+      randomValues: '',
+      dayValue: 'Good day',
+      nightValue: 'Good night',
+      defaultValue: 'Hello',
+    })
+    expect(conditional).toContain('Day:')
+    expect(conditional).toContain('Night:')
+    expect(conditional).toContain('Default:')
   })
 })
 
 describe('mythiccrucible classify and scaffold', () => {
-  it('classifies equipment-sets and augments files', () => {
+  it('classifies equipment-sets, augments, lore-templates, and placeholders', () => {
     expect(classifyMythicCategory('Packs/Demo/equipment-sets.yml')).toBe('equipment-sets')
     expect(classifyMythicCategory('Packs/Demo/augments.yml')).toBe('augments')
+    expect(classifyMythicCategory('Packs/Demo/lore-templates.yml')).toBe('lore-templates')
+    expect(classifyMythicCategory('Packs/Demo/placeholders.yml')).toBe('placeholders')
+    expect(classifyMythicCategory('Packs/Demo/stats.yml')).toBe('stats')
   })
 
   it('scaffolds Crucible files when Crucible addon is on', () => {
@@ -91,6 +241,9 @@ describe('mythiccrucible classify and scaffold', () => {
     })
     expect(files.some((f) => f.path.endsWith('equipment-sets.yml'))).toBe(true)
     expect(files.some((f) => f.path.endsWith('augments.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('stats.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('lore-templates.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('placeholders.yml'))).toBe(true)
   })
 
   it('does not scaffold Crucible files when Crucible addon is off', () => {
@@ -100,6 +253,8 @@ describe('mythiccrucible classify and scaffold', () => {
     })
     expect(files.some((f) => f.path.endsWith('equipment-sets.yml'))).toBe(false)
     expect(files.some((f) => f.path.endsWith('augments.yml'))).toBe(false)
+    expect(files.some((f) => f.path.endsWith('lore-templates.yml'))).toBe(false)
+    expect(files.some((f) => f.path.endsWith('placeholders.yml'))).toBe(false)
   })
 })
 
@@ -121,7 +276,6 @@ describe('resolveMythicCatalogs', () => {
     expect(catalogs.triggers.some((t) => t.id === 'onCrouch')).toBe(true)
     expect(catalogs.targeters.some((t) => t.id === 'FurnitureInRadius')).toBe(true)
     expect(catalogs.conditions.some((c) => c.id === 'hasitem')).toBe(true)
-    // Shared trigger ids are not duplicated
     const attackCount = catalogs.triggers.filter((t) => t.id === 'onAttack').length
     expect(attackCount).toBe(1)
     expect(catalogs.triggers.length).toBe(TRIGGERS.length + CRUCIBLE_TRIGGERS.length)

@@ -1,47 +1,3 @@
-/** Crucible Options keys under an item Options: block. */
-export const CRUCIBLE_OPTION_KEYS = [
-  'CancelDamage',
-  'Destroy',
-  'DestroyOnDrop',
-  'KeepOnDeath',
-  'PreventDropping',
-  'Permission',
-  'Placeable',
-  'PreventAnvil',
-  'PreventSmithing',
-  'PreventCrafting',
-  'PreventEnchanting',
-  'PreventStacking',
-  'Repairable',
-  'SkillType',
-  'HideFlags',
-] as const
-
-/** Extra item body keys available when Crucible is enabled. */
-export const CRUCIBLE_ITEM_BODY_KEYS = [
-  'Type',
-  'Group',
-  'EquipmentSet',
-  'Stats',
-  'MaxDurability',
-  'Durability',
-  'Upgrades',
-  'AugmentationSlots',
-  'Augmentation',
-  'AugmentationSocket',
-  'AugmentationRemover',
-  'ItemUpdater',
-  'Recipes',
-  'Inventory',
-  'Model',
-  'Generation',
-  'Template',
-  'Trim',
-  'Potion',
-  'Food',
-  'Consumable',
-] as const
-
 /** Lore / placeholder snippets for Crucible dynamic lore. */
 export const CRUCIBLE_LORE_PLACEHOLDERS = [
   '{stats}',
@@ -59,3 +15,9 @@ export const CRUCIBLE_LORE_PLACEHOLDERS = [
   '<item.level.description>',
   '<item.upgrade.description>',
 ] as const
+
+/** Common weapon lore that shows stats (and optionally the equipment set block). */
+export const DEFAULT_WEAPON_STATS_LORE =
+  '{stats}\n{stats}<gray>Stats:\n{stats-each}<white><stat.display>'
+
+export const DEFAULT_SET_PIECE_LORE = `${DEFAULT_WEAPON_STATS_LORE}\n{equipment-set}`
