@@ -268,8 +268,8 @@ export interface SavePrefs {
 }
 
 export const DEFAULT_SAVE_PREFS: SavePrefs = {
-  autoSave: false,
-  autoSaveInterval: 30,
+  autoSave: true,
+  autoSaveInterval: 300,
   backupFolder: '',
   autoBackup: false,
   backupEvery: 5,

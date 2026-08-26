@@ -32,40 +32,38 @@ interface NewPackDialogProps {
 }
 
 const AUTOSAVE_INTERVALS: { value: number; label: string }[] = [
-  { value: 10, label: '10s' },
   { value: 30, label: '30s' },
   { value: 60, label: '1m' },
   { value: 120, label: '2m' },
   { value: 300, label: '5m' },
 ]
 
-function leadCopy(workspaceId: WorkspaceKind, includeExamples: boolean): string {
+function leadCopy(workspaceId: WorkspaceKind): string {
   if (workspaceId === 'mythicmobs') {
-    if (includeExamples) {
-      return 'Creates MythicMobs/Packs/{name}/ with a linked Galebound example pack: mobs, skills, loot, and items that reference each other. MythicRPG and Crucible add-ons in Settings add more linked files when those add-ons are enabled.'
-    }
-    return 'Creates MythicMobs/Packs/{name}/ with empty Mobs, Items, Skills, and related folders. Turn on linked examples below for a small starter pack you can run on a server. Save into your plugins folder so paths match the server.'
+    return 'Creates MythicMobs/Packs/{name}/ with Mobs, Items, Skills, and related folders.'
   }
   if (workspaceId === 'mmocore') {
-    return 'Creates MMOCore/, MythicLib/, and MythicMobs/Packs/ starters as sibling folders. Save into your plugins folder so each tree lands in the matching plugin directory.'
+    return 'Creates MMOCore/, MythicLib/, and MythicMobs/Packs/ as sibling folders.'
   }
   if (workspaceId === 'mmoitems') {
-    return 'Creates MMOItems/item/material.yml. Save into your plugins folder, or open plugins/MMOItems/ and move the file into item/ if needed.'
+    return 'Creates MMOItems/item/material.yml.'
   }
   if (workspaceId === 'soapsquest') {
-    return 'Creates quests.yml, tiers.yml, and difficulties.yml for SoapsQuest. Save into plugins/SoapsQuest/ on your server.'
+    return 'Creates quests.yml, tiers.yml, and difficulties.yml.'
   }
   if (workspaceId === 'soapstraits') {
-    return 'Creates traits.yml for SoapsTraits. Save into plugins/SoapsTraits/ on your server.'
+    return 'Creates traits.yml for SoapsTraits.'
   }
   return 'Creates starter YAML for this plugin.'
 }
 
-function exampleAddonSummary(addons: MythicAddons): string {
-  const parts: string[] = ['MythicMobs core']
-  if (addons.mythicrpg) parts.push('MythicRPG spells and archetypes')
-  if (addons.crucible) parts.push('Crucible sets, gear, stats, and lore templates')
-  return parts.join(', ')
+function examplesHint(addons?: MythicAddons): string {
+  if (!addons) return 'Adds a small linked starter pack you can run on a server.'
+  const extras: string[] = []
+  if (addons.mythicrpg) extras.push('MythicRPG')
+  if (addons.crucible) extras.push('Crucible')
+  if (extras.length === 0) return 'Adds the Galebound starter pack with linked mobs, skills, and items.'
+  return `Adds the Galebound starter pack. Also includes ${extras.join(' and ')} files from Settings.`
 }
 
 export function NewPackDialog({
@@ -79,11 +77,9 @@ export function NewPackDialog({
   const workspace = getWorkspace(workspaceId)
   const defaultName = workspaceId === 'mmocore' ? 'MyClassPack' : 'MyPack'
   const [packName, setPackName] = useState(defaultName)
-  const [saveTarget, setSaveTarget] = useState<'browser' | 'folder'>(
-    folderPickerAvailable ? 'folder' : 'browser',
-  )
-  const [autoSave, setAutoSave] = useState(savePrefs.autoSave)
-  const [autoSaveInterval, setAutoSaveInterval] = useState(savePrefs.autoSaveInterval)
+  const [saveTarget, setSaveTarget] = useState<'browser' | 'folder'>('browser')
+  const [autoSave, setAutoSave] = useState(true)
+  const [autoSaveInterval, setAutoSaveInterval] = useState(300)
   const [includeExamples, setIncludeExamples] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -108,7 +104,7 @@ export function NewPackDialog({
       packName: packName.trim(),
       saveTarget,
       autoSave,
-      autoSaveInterval,
+      autoSaveInterval: autoSave ? autoSaveInterval : savePrefs.autoSaveInterval,
       includeExamples: workspaceId === 'mythicmobs' ? includeExamples : undefined,
     })
   }
@@ -119,26 +115,10 @@ export function NewPackDialog({
         title={workspace?.startDialogTitle ?? 'Start new files'}
         titleId="new-pack-title"
         onClose={onClose}
-        lead={leadCopy(workspaceId, includeExamples)}
+        lead={leadCopy(workspaceId)}
       />
 
-      <DialogBody>
-        {workspaceId === 'mythicmobs' ? (
-          <DialogPanel>
-            <DialogSwitchRow
-              title="Include linked examples"
-              hint={
-                mythicAddons && includeExamples
-                  ? `Adds the Galebound Covenant starter pack with cross-linked mobs, skills, loot, and items. Includes: ${exampleAddonSummary(mythicAddons)}.`
-                  : 'Adds the Galebound Covenant starter pack with cross-linked mobs, skills, loot, and items. MythicRPG and Crucible content follows your Settings add-ons.'
-              }
-              checked={includeExamples}
-              onChange={setIncludeExamples}
-              ariaLabel="Include linked examples"
-            />
-          </DialogPanel>
-        ) : null}
-
+      <DialogBody className="dialog-pack-body">
         <label className="dialog-name-field">
           {workspace?.nameFieldLabel ?? 'Name'}
           <input
@@ -156,21 +136,31 @@ export function NewPackDialog({
           />
         </label>
 
-        <DialogPanel title="Where to save">
-          <DialogOptionGrid label="Where to save">
+        {workspaceId === 'mythicmobs' ? (
+          <DialogSwitchRow
+            title="Linked examples"
+            hint={examplesHint(mythicAddons)}
+            checked={includeExamples}
+            onChange={setIncludeExamples}
+            ariaLabel="Include linked examples"
+          />
+        ) : null}
+
+        <DialogPanel title="Save to">
+          <DialogOptionGrid label="Save to">
             <DialogOption
               selected={saveTarget === 'browser'}
-              title="Save in browser"
-              description="Stays on this computer until you clear site data. Export ZIP when you want the files on disk."
+              title="Browser"
+              description="Keeps files here. Export a ZIP when you need them on disk."
               onClick={() => setSaveTarget('browser')}
             />
             <DialogOption
               selected={saveTarget === 'folder'}
-              title="Save to folder"
+              title="Folder"
               description={
                 folderPickerAvailable
-                  ? 'Writes files directly into a folder you choose. Best for server plugin directories.'
-                  : 'Folder access is not available in this browser. Use Save in browser or open in Chrome, Edge, or Brave.'
+                  ? 'Writes into a folder you choose.'
+                  : 'Not available in this browser.'
               }
               disabled={!folderPickerAvailable}
               onClick={() => setSaveTarget('folder')}
@@ -178,14 +168,10 @@ export function NewPackDialog({
           </DialogOptionGrid>
         </DialogPanel>
 
-        <DialogPanel title="Auto-save">
+        <div className="dialog-pack-autosave">
           <DialogSwitchRow
             title="Auto-save"
-            hint={
-              autoSave
-                ? 'Changed files save on a timer.'
-                : 'You can turn this on later in Settings.'
-            }
+            hint={autoSave ? 'Saves changed files on a timer.' : 'Turn on to save on a timer.'}
             checked={autoSave}
             onChange={setAutoSave}
             ariaLabel="Auto-save"
@@ -204,7 +190,7 @@ export function NewPackDialog({
               ))}
             </div>
           ) : null}
-        </DialogPanel>
+        </div>
       </DialogBody>
 
       <DialogFooter>
