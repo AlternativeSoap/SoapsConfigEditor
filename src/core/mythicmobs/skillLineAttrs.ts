@@ -1,4 +1,6 @@
 import { MECHANICS, type MechanicAttr, type MechanicEntry } from '../../data/mythicmobs/mechanics'
+import type { ConditionEntry } from '../../data/mythicmobs/conditions'
+import type { TargeterEntry } from '../../data/mythicmobs/targeters'
 import { inferAttrTypeFromName } from './attrRegistry'
 import { parseSkillLineParts, stripSkillLineListPrefix } from './skillLineParts'
 
@@ -216,6 +218,16 @@ export function getMechanicAttrs(mechanic: MechanicEntry): MechanicAttr[] {
   const merged = mergeAttrs(mechanic.attributes ?? [], attrsFromInsertSnippet(mechanic.insertSnippet))
   mechanicAttrsCache.set(mechanic.id, merged)
   return merged
+}
+
+/** Snippet attrs for a targeter (may be empty for bare @Self-style entries). */
+export function getTargeterAttrs(targeter: TargeterEntry): MechanicAttr[] {
+  return attrsFromInsertSnippet(targeter.insertSnippet)
+}
+
+/** Snippet attrs for a condition (may be empty for boolean-only entries). */
+export function getConditionAttrs(condition: ConditionEntry): MechanicAttr[] {
+  return attrsFromInsertSnippet(condition.insertSnippet)
 }
 
 for (const m of MECHANICS) {

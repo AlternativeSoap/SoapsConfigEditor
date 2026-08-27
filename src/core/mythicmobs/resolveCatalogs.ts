@@ -14,10 +14,34 @@ export interface MythicCatalogs {
   triggers: TriggerEntry[]
 }
 
+/** Append extras that are not already in base (by id). */
 function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {
   const seen = new Set(base.map((e) => e.id.toLowerCase()))
   const added = extra.filter((e) => !seen.has(e.id.toLowerCase()))
   return added.length === 0 ? base : [...base, ...added]
+}
+
+/** Merge extras over base when ids collide (Crucible upgrades like hasitem). */
+function mergePreferExtra<T extends { id: string }>(base: T[], extra: T[]): T[] {
+  const byId = new Map(base.map((e) => [e.id.toLowerCase(), e]))
+  for (const e of extra) byId.set(e.id.toLowerCase(), e)
+  const order: string[] = []
+  const seen = new Set<string>()
+  for (const e of base) {
+    const key = e.id.toLowerCase()
+    if (!seen.has(key)) {
+      order.push(key)
+      seen.add(key)
+    }
+  }
+  for (const e of extra) {
+    const key = e.id.toLowerCase()
+    if (!seen.has(key)) {
+      order.push(key)
+      seen.add(key)
+    }
+  }
+  return order.map((key) => byId.get(key)!)
 }
 
 const BASE_CATALOGS: MythicCatalogs = {
@@ -36,7 +60,7 @@ export function resolveMythicCatalogs(crucible: boolean): MythicCatalogs {
     crucibleCatalogs = {
       mechanics: mergeById(MECHANICS, CRUCIBLE_MECHANICS),
       targeters: mergeById(TARGETERS, CRUCIBLE_TARGETERS),
-      conditions: mergeById(CONDITIONS, CRUCIBLE_CONDITIONS),
+      conditions: mergePreferExtra(CONDITIONS, CRUCIBLE_CONDITIONS),
       triggers: mergeById(TRIGGERS, CRUCIBLE_TRIGGERS),
     }
   }

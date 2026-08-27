@@ -16,7 +16,8 @@ import {
   type PresetCategory,
   type SkillPreset,
 } from '../data/mythicmobs/projectilePresets'
-import { attrsFromInsertSnippet, type SkillLineContext } from '../core/mythicmobs/skillLineAttrs'
+import { getConditionAttrs, getMechanicAttrs, getTargeterAttrs, type SkillLineContext } from '../core/mythicmobs/skillLineAttrs'
+import { augmentBraceAttrs } from '../core/mythicmobs/attrValueCompletions'
 import { resolveMythicCatalogs } from '../core/mythicmobs/resolveCatalogs'
 
 type Tab = 'presets' | 'mechanics' | 'targeters' | 'triggers' | 'conditions'
@@ -258,7 +259,8 @@ export function ReferencePanel({
                 <div className="ref-group-label">{MECHANIC_CATEGORY_LABELS[cat]}</div>
                 {items.map((m: MechanicEntry) => {
                   const isExpanded = expandedId === m.id
-                  const hasAttrs = m.attributes && m.attributes.length > 0
+                  const attrs = augmentBraceAttrs(getMechanicAttrs(m), m.id, 'mechanic')
+                  const hasAttrs = attrs.length > 0
                   return (
                     <div key={m.id} className={`ref-entry ${isExpanded ? 'ref-entry-expanded' : ''}`}>
                       <div className="ref-entry-info">
@@ -278,7 +280,7 @@ export function ReferencePanel({
                         <span className="ref-entry-desc">{m.description}</span>
                         {isExpanded && hasAttrs && (
                           <AttrHints
-                            attrs={m.attributes!}
+                            attrs={attrs}
                             presentAttrs={lineContext.mechanicId === m.id ? lineContext.presentAttrs : []}
                             onInsert={(attr) => onInsertMechanicAttr(m.id, attr)}
                           />
@@ -387,7 +389,7 @@ export function ReferencePanel({
                 <div className="ref-group-label">{label}</div>
                 {items.map((t: TargeterEntry) => {
                   const isExpanded = expandedId === t.id
-                  const snippetAttrs = attrsFromInsertSnippet(t.insertSnippet)
+                  const snippetAttrs = augmentBraceAttrs(getTargeterAttrs(t), t.id, 'targeter')
                   const hasAttrs = snippetAttrs.length > 0
                   return (
                   <div key={t.id} className={`ref-entry ${isExpanded ? 'ref-entry-expanded' : ''}`}>
@@ -469,7 +471,7 @@ export function ReferencePanel({
                 <div className="ref-group-label">{label}</div>
                 {items.map((c: ConditionEntry) => {
                   const isExpanded = expandedId === c.id
-                  const snippetAttrs = attrsFromInsertSnippet(c.insertSnippet)
+                  const snippetAttrs = getConditionAttrs(c)
                   const hasAttrs = snippetAttrs.length > 0
                   return (
                   <div key={c.id} className={`ref-entry ${isExpanded ? 'ref-entry-expanded' : ''}`}>

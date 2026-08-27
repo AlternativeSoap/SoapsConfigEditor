@@ -276,6 +276,9 @@ describe('resolveMythicCatalogs', () => {
     expect(catalogs.triggers.some((t) => t.id === 'onCrouch')).toBe(true)
     expect(catalogs.targeters.some((t) => t.id === 'FurnitureInRadius')).toBe(true)
     expect(catalogs.conditions.some((c) => c.id === 'hasitem')).toBe(true)
+    const hasitem = catalogs.conditions.find((c) => c.id === 'hasitem')
+    expect(hasitem?.insertSnippet).toContain('item=')
+    expect(hasitem?.insertSnippet).not.toContain('material=')
     const attackCount = catalogs.triggers.filter((t) => t.id === 'onAttack').length
     expect(attackCount).toBe(1)
     expect(catalogs.triggers.length).toBe(TRIGGERS.length + CRUCIBLE_TRIGGERS.length)

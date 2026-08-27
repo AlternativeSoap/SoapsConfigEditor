@@ -3,6 +3,7 @@ import { MECHANICS } from '../../data/mythicmobs/mechanics'
 import {
   augmentBraceAttrs,
   currentParticleFromInside,
+  DAMAGE_CAUSES,
   enumOptionsFromDesc,
   optionsForAttr,
   valuesForAttr,
@@ -47,8 +48,8 @@ describe('attrValueCompletions', () => {
     expect(valuesForAttr('fillchest', { name: 'table', type: 'string' }, [], [], [], ['LOOT_A'])).toEqual(['LOOT_A'])
   })
 
-  it('returns materials for material attr', () => {
-    const values = valuesForAttr('giveitem', { name: 'material', type: 'string' }, [], [], [], [])
+  it('returns materials for item attr on giveitem', () => {
+    const values = valuesForAttr('giveitem', { name: 'item', type: 'string' }, [], [], [], [])
     expect(values).toContain('DIAMOND')
     expect(values).toContain('STONE')
   })
@@ -86,7 +87,7 @@ describe('attrValueCompletions', () => {
   })
 
   it('returns equip slots including wiki aliases that apply as canonical', () => {
-    const options = optionsForAttr('equip', { name: 'slot', type: 'enum' }, [], [], [], [], '', '')
+    const options = optionsForAttr('wearing', { name: 'slot', type: 'enum' }, [], [], [], [], '', '')
     expect(options.some((o) => o.label === 'HEAD' && o.apply === 'HEAD')).toBe(true)
     const helmet = options.find((o) => o.label === 'HELMET')
     expect(helmet?.apply).toBe('HEAD')
@@ -149,6 +150,78 @@ describe('attrValueCompletions', () => {
     expect(names).toContain('audience')
     expect(names).toContain('particle')
     expect(names).toContain('color')
+  })
+
+  it('injects universal mechanic attrs', () => {
+    const names = augmentBraceAttrs([], 'damage', 'mechanic').map((a) => a.name)
+    expect(names).toContain('cooldown')
+    expect(names).toContain('delay')
+    expect(names).toContain('chance')
+    expect(names).toContain('power')
+  })
+
+  it('injects common attrs on bare and radius targeters', () => {
+    const self = augmentBraceAttrs([], 'Self', 'targeter').map((a) => a.name)
+    expect(self).toContain('conditions')
+    expect(self).toContain('fallback')
+    expect(self).not.toContain('radius')
+
+    const radius = augmentBraceAttrs([], 'PlayersInRadius', 'targeter').map((a) => a.name)
+    expect(radius).toContain('limit')
+    expect(radius).toContain('sort')
+    expect(radius).toContain('r')
+
+    const world = augmentBraceAttrs([], 'PlayersInWorld', 'targeter').map((a) => a.name)
+    expect(world).toContain('conditions')
+    expect(world).not.toContain('radius')
+    expect(world).not.toContain('limit')
+  })
+
+  it('uses UPPER_SNAKE damage causes', () => {
+    expect(DAMAGE_CAUSES).toContain('ENTITY_ATTACK')
+    expect(DAMAGE_CAUSES).not.toContain('entity_attack')
+  })
+
+  it('injects full projectile inheritable attrs', () => {
+    const names = augmentBraceAttrs([], 'projectile', 'mechanic').map((a) => a.name)
+    expect(names).toContain('onTick')
+    expect(names).toContain('bulletType')
+    expect(names).toContain('fromOrigin')
+    expect(names).toContain('hitConditions')
+    expect(names).toContain('startYOffset')
+    expect(names).toContain('hugSurface')
+    expect(names).toContain('gravity')
+    expect(names).toContain('material')
+  })
+
+  it('injects missile inertia and not the old turnRate attr', () => {
+    const names = augmentBraceAttrs([], 'missile', 'mechanic').map((a) => a.name)
+    expect(names).toContain('inertia')
+    expect(names).toContain('fromOrigin')
+    expect(names).not.toContain('turnRate')
+  })
+
+  it('injects projectile inheritable attrs onto shoot and orbital', () => {
+    const shoot = augmentBraceAttrs([], 'shoot', 'mechanic').map((a) => a.name)
+    expect(shoot).toContain('hitConditions')
+    expect(shoot).toContain('bulletType')
+    expect(shoot).not.toContain('hugSurface')
+
+    const orbital = augmentBraceAttrs([], 'orbital', 'mechanic').map((a) => a.name)
+    expect(orbital).toContain('bulletType')
+    expect(orbital).toContain('hitTargeter')
+  })
+
+  it('offers bulletType enum values', () => {
+    const values = valuesForAttr('projectile', { name: 'bulletType', type: 'enum' }, [], [], [], [])
+    expect(values).toContain('ARROW')
+    expect(values).toContain('DISPLAY')
+    expect(values).toContain('ME')
+  })
+
+  it('offers NORMAL/METEOR for projectile type', () => {
+    const values = valuesForAttr('projectile', { name: 'type', type: 'enum' }, [], [], [], [])
+    expect(values).toEqual(['NORMAL', 'METEOR'])
   })
 
   it('offers @ audience starters when typed value starts with @', () => {

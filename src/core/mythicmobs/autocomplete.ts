@@ -23,9 +23,10 @@ import {
 import {
   attrInsertPrefix,
   attrSnippet,
-  attrsFromInsertSnippet,
   findMechanic,
+  getConditionAttrs,
   getMechanicAttrs,
+  getTargeterAttrs,
   parseAttrNames,
 } from './skillLineAttrs'
 import type { MechanicAttr } from '../../data/mythicmobs/mechanics'
@@ -549,8 +550,9 @@ function braceAttrCompletion(
     inside: string,
     attrs: MechanicAttr[],
     blockId: string,
+    kind: 'mechanic' | 'targeter' | 'condition' = 'mechanic',
   ): CompletionResult | null => {
-    const merged = augmentBraceAttrs(attrs, blockId)
+    const merged = augmentBraceAttrs(attrs, blockId, kind)
     const valueResult = buildBraceAttrValueCompletions(
       inside,
       merged,
@@ -569,7 +571,7 @@ function braceAttrCompletion(
   if (mechMatch) {
     const mechanic = findMechanic(mechMatch[1] ?? '', catalogs.mechanics)
     if (mechanic) {
-      const result = tryBlock(mechMatch[2] ?? '', getMechanicAttrs(mechanic), mechanic.id)
+      const result = tryBlock(mechMatch[2] ?? '', getMechanicAttrs(mechanic), mechanic.id, 'mechanic')
       if (result) return result
     }
   }
@@ -577,14 +579,13 @@ function braceAttrCompletion(
   const targeterMatch = /@([A-Za-z][A-Za-z0-9_]*)\{([^}]*)$/.exec(before)
   if (targeterMatch) {
     const targeter = catalogs.targeters.find(
-      (t) => t.id.toLowerCase() === (targeterMatch[1] ?? '').toLowerCase(),
+      (t) =>
+        t.id.toLowerCase() === (targeterMatch[1] ?? '').toLowerCase() ||
+        t.shorthand.some((s) => s.replace(/^@/, '').toLowerCase() === (targeterMatch[1] ?? '').toLowerCase()),
     )
     if (targeter) {
-      const attrs = attrsFromInsertSnippet(targeter.insertSnippet)
-      if (attrs.length) {
-        const result = tryBlock(targeterMatch[2] ?? '', attrs, targeter.id)
-        if (result) return result
-      }
+      const result = tryBlock(targeterMatch[2] ?? '', getTargeterAttrs(targeter), targeter.id, 'targeter')
+      if (result) return result
     }
   }
 
@@ -594,11 +595,8 @@ function braceAttrCompletion(
       (c) => c.id.toLowerCase() === (condMatch[1] ?? '').toLowerCase(),
     )
     if (condition) {
-      const attrs = attrsFromInsertSnippet(condition.insertSnippet)
-      if (attrs.length) {
-        const result = tryBlock(condMatch[2] ?? '', attrs, condition.id)
-        if (result) return result
-      }
+      const result = tryBlock(condMatch[2] ?? '', getConditionAttrs(condition), condition.id, 'condition')
+      if (result) return result
     }
   }
 

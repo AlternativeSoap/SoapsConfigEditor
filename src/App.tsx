@@ -423,7 +423,7 @@ function App() {
 
   const questsFileEntry = useMemo(() => {
     if (!isSoapsQuest) return null
-    return (
+  return (
       effectiveFiles.find((f) => {
         const n = f.path.replace(/\\/g, '/').toLowerCase()
         return n === 'quests.yml' || n.endsWith('/quests.yml')
@@ -1385,7 +1385,7 @@ function App() {
               <button type="button" className="primary" onClick={() => setNewPackOpen(true)}>
                 {workspace.startLabel}
               </button>
-            </div>
+        </div>
           </div>
         ) : null}
         {browserKind === 'brave' && !directoryPickerSupported() ? (
@@ -1455,8 +1455,8 @@ function App() {
               {workspace?.name ?? 'YAML'} · {rootLabel}
               {needsSaveFolder ? <span className="brand-badge">Browser only</span> : null}
               {dirtyCount > 0 ? <span className="brand-badge dirty">{dirtyCount} unsaved</span> : null}
-            </p>
-          </div>
+          </p>
+        </div>
         </div>
         <div className="topbar-actions">
           <TopbarFileMenu
@@ -1476,14 +1476,14 @@ function App() {
             onChangeWorkspace={changeWorkspace}
           />
           {canExportFromBrowser ? (
-            <button
-              type="button"
+        <button
+          type="button"
               className={needsSaveFolder ? 'primary' : ''}
               onClick={() => void exportPackAsZip()}
               title="Download all files as a ZIP"
-            >
+        >
               Export ZIP
-            </button>
+        </button>
           ) : null}
           <button
             type="button"
@@ -1705,7 +1705,7 @@ function App() {
                           )
                         })
                       : null}
-                  </section>
+      </section>
                 )
               })
             )}
@@ -1756,7 +1756,7 @@ function App() {
                   onApplyPatches={applyFilePatches}
                 />
               )}
-            </div>
+        </div>
           )}
 
           {isSoapsQuest && files.length > 0 && (
@@ -1878,7 +1878,7 @@ function App() {
               {parseIssues[0]?.line ? ` (line ${parseIssues[0].line})` : ''}
             </p>
           ) : null}
-        </section>
+      </section>
 
         {refPanelOpen && isMythicMobs ? (
           <>

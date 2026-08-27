@@ -122,14 +122,6 @@ export function isDustOptionsParticle(name: string): boolean {
   return DUST_PARTICLES.has(name.toUpperCase())
 }
 
-/** Kept for HMR/cache compatibility; prefer isDustOptionsParticle. */
-export function particleDatatype(name: string): 'dust' | 'dustTransition' | 'none' {
-  const upper = name.toUpperCase()
-  if (upper === 'DUST') return 'dust'
-  if (upper === 'DUST_COLOR_TRANSITION') return 'dustTransition'
-  return 'none'
-}
-
 /** Practical hex palette for dust particles (wiki default first). */
 export const PARTICLE_HEX_COLORS = [
   '#FF0000',

@@ -1,14 +1,6 @@
 import type { Text } from '@codemirror/state'
 import type { MythicCategory } from '../../types'
-import {
-  bodyKeyDefsForCategory,
-  bodyKeyIndentForCategory,
-  DROPTABLE_BODY_DEFS,
-  ITEM_BODY_DEFS,
-  MOB_BODY_DEFS,
-  RANDOMSPAWN_BODY_DEFS,
-  SKILL_BODY_DEFS,
-} from '../yaml/bodyKeyCatalogs'
+import { bodyKeyDefsForCategory, bodyKeyIndentForCategory } from '../yaml/bodyKeyCatalogs'
 import { defsToKeys } from '../yaml/bodyKeyDefs'
 
 export type { BodyKeyDef } from '../yaml/bodyKeyDefs'
@@ -214,21 +206,6 @@ export function detectYamlEditContext(doc: Text, lineNumber: number, fileCategor
   const parentKey = raw ? normalizeYamlParentKey(raw) : null
   return { parentKey, lineIndent, fileCategory }
 }
-
-/** @deprecated Prefer MOB_BODY_DEFS */
-export const MOB_BODY_KEYS = defsToKeys(MOB_BODY_DEFS)
-
-/** @deprecated Prefer SKILL_BODY_DEFS */
-export const SKILL_BODY_KEYS = defsToKeys(SKILL_BODY_DEFS)
-
-/** @deprecated Prefer ITEM_BODY_DEFS */
-export const ITEM_BODY_KEYS = defsToKeys(ITEM_BODY_DEFS)
-
-/** @deprecated Prefer DROPTABLE_BODY_DEFS */
-export const DROPTABLE_BODY_KEYS = defsToKeys(DROPTABLE_BODY_DEFS)
-
-/** @deprecated Prefer RANDOMSPAWN_BODY_DEFS */
-export const RANDOMSPAWN_BODY_KEYS = defsToKeys(RANDOMSPAWN_BODY_DEFS)
 
 export { EQUIPMENT_SLOTS } from '../../data/mythicmobs/equipSlots'
 

@@ -9,6 +9,29 @@ import {
   PARTICLE_HEX_COLORS,
   PARTICLE_TYPES,
 } from '../../data/mythicmobs/particleTypes'
+import {
+  ARROW_BULLET_TYPES,
+  BULLET_TYPES,
+  isMissileFamilyBlock,
+  isProjectileFlightBlock,
+  isProjectileInheritBlock,
+  LOS_MODE_VALUES,
+  MISSILE_EXTRA_ATTRS,
+  PROJECTILE_BULLET_ATTRS,
+  PROJECTILE_FLIGHT_ATTRS,
+  PROJECTILE_INHERITABLE_ATTRS,
+  PROJECTILE_TYPES,
+} from '../../data/mythicmobs/projectileAttrs'
+import {
+  ALL_TARGETER_ATTRS,
+  AUDIENCE_ATTR,
+  COMMON_TARGETER_ATTRS,
+  isRadiusLikeTargeter,
+  isThreatTargeter,
+  THREAT_TARGETER_ATTRS,
+  UNIVERSAL_MECHANIC_ATTRS,
+  VISIBILITY_MECHANIC_IDS,
+} from '../../data/mythicmobs/sharedSkillAttrs'
 import { MINECRAFT_SOUND_KEYS } from '../../data/mythicmobs/soundKeys'
 import { DROPTABLE_ATTRS, ITEM_ATTRS, SKILL_REF_ATTRS, SLOT_ATTRS } from './attrRegistry'
 import { parseAttrNames } from './skillLineAttrs'
@@ -28,10 +51,10 @@ export const POTION_EFFECTS = [
 ]
 
 export const DAMAGE_CAUSES = [
-  'entity_attack', 'entity_sweep_attack', 'projectile', 'magic', 'fire', 'fire_tick', 'lava',
-  'drowning', 'block_explosion', 'entity_explosion', 'fall', 'fly_into_wall', 'hot_floor',
-  'cramming', 'lightning', 'starvation', 'poison', 'wither', 'falling_block', 'thorns',
-  'dragon_breath', 'custom', 'sonic_boom', 'freeze', 'dryout', 'kill', 'void', 'contact',
+  'ENTITY_ATTACK', 'ENTITY_SWEEP_ATTACK', 'PROJECTILE', 'MAGIC', 'FIRE', 'FIRE_TICK', 'LAVA',
+  'DROWNING', 'BLOCK_EXPLOSION', 'ENTITY_EXPLOSION', 'FALL', 'FLY_INTO_WALL', 'HOT_FLOOR',
+  'CRAMMING', 'LIGHTNING', 'STARVATION', 'POISON', 'WITHER', 'FALLING_BLOCK', 'THORNS',
+  'DRAGON_BREATH', 'CUSTOM', 'SONIC_BOOM', 'FREEZE', 'DRYOUT', 'KILL', 'VOID', 'CONTACT',
 ]
 
 export const TEAM_COLORS = [
@@ -182,10 +205,45 @@ function mergeAttrLists(base: MechanicAttr[], extra: MechanicAttr[]): MechanicAt
   return [...byName.values()]
 }
 
-/** Inject shared particle-family attrs for brace name/value AC. */
-export function augmentBraceAttrs(attrs: MechanicAttr[], blockId: string): MechanicAttr[] {
-  if (!isParticleFamilyBlock(blockId)) return attrs
-  return mergeAttrLists(attrs, PARTICLE_FAMILY_ATTRS)
+/**
+ * Inject shared attrs for brace name/value AC.
+ * `kind` controls which shared catalogs apply (mechanics vs targeters).
+ */
+export function augmentBraceAttrs(
+  attrs: MechanicAttr[],
+  blockId: string,
+  kind: 'mechanic' | 'targeter' | 'condition' = 'mechanic',
+): MechanicAttr[] {
+  if (kind === 'condition') return attrs
+
+  if (kind === 'targeter') {
+    let merged = mergeAttrLists(attrs, ALL_TARGETER_ATTRS)
+    if (isThreatTargeter(blockId)) merged = mergeAttrLists(merged, THREAT_TARGETER_ATTRS)
+    else if (isRadiusLikeTargeter(blockId)) merged = mergeAttrLists(merged, COMMON_TARGETER_ATTRS)
+    return merged
+  }
+
+  let merged = mergeAttrLists(attrs, UNIVERSAL_MECHANIC_ATTRS)
+  const id = blockId.toLowerCase()
+
+  if (isParticleFamilyBlock(blockId)) {
+    merged = mergeAttrLists(merged, PARTICLE_FAMILY_ATTRS)
+  }
+  if (VISIBILITY_MECHANIC_IDS.has(id) || isParticleFamilyBlock(blockId)) {
+    merged = mergeAttrLists(merged, [AUDIENCE_ATTR])
+  }
+  if (isProjectileInheritBlock(blockId)) {
+    merged = mergeAttrLists(merged, PROJECTILE_INHERITABLE_ATTRS)
+    merged = mergeAttrLists(merged, PROJECTILE_BULLET_ATTRS)
+  }
+  if (isProjectileFlightBlock(blockId)) {
+    merged = mergeAttrLists(merged, PROJECTILE_FLIGHT_ATTRS)
+  }
+  if (isMissileFamilyBlock(blockId)) {
+    merged = mergeAttrLists(merged, MISSILE_EXTRA_ATTRS)
+  }
+
+  return merged
 }
 
 function syntheticAttr(attrName: string, blockId: string): MechanicAttr | null {
@@ -271,6 +329,12 @@ export function valuesForAttr(
   if (name === 'sound') return [...MINECRAFT_SOUND_KEYS]
   if (name === 'particle') return [...PARTICLE_TYPES]
   if (name === 'audience') return [...AUDIENCE_VALUES]
+  if (name === 'bullettype' || name === 'bullet') return [...BULLET_TYPES]
+  if (name === 'arrowtype' || name === 'bulletarrowtype') return [...ARROW_BULLET_TYPES]
+  if (name === 'requirelineofsight' || name === 'rlos' || name === 'los' || name === 'requirelos') {
+    return [...LOS_MODE_VALUES]
+  }
+  if (name === 'highaccuracymode' || name === 'ham') return [...LOS_MODE_VALUES]
   if (HEX_COLOR_ATTRS.has(name) && usesHexParticleColor(braceInside, blockId)) {
     return [...PARTICLE_HEX_COLORS]
   }
@@ -289,6 +353,7 @@ export function valuesForAttr(
   }
 
   if (name === 'type') {
+    if (isProjectileFlightBlock(blockId)) return [...PROJECTILE_TYPES]
     if (block === 'potion' || block === 'summonareaeffectcloud' || block === 'potionclear') {
       return POTION_EFFECTS
     }
@@ -303,6 +368,13 @@ export function valuesForAttr(
       return [...new Set([...ENTITY_TYPES, ...packMobIds])]
     }
     if (block === 'weather' || block === 'setweather') return WEATHER_TYPES
+    if (block === 'shoot' || block === 'volley' || block === 'arrowvolley') {
+      return ['ARROW', 'SNOWBALL', 'EGG', 'ENDERPEARL', 'POTION', 'LINGERING_POTION', 'ITEM', 'BLOCK', 'TRIDENT']
+    }
+  }
+
+  if (name === 'mob' && isProjectileInheritBlock(blockId)) {
+    return packMobIds.length ? packMobIds : ENTITY_TYPES
   }
 
   if (name === 'entitytype' || name === 'mobtype') {
