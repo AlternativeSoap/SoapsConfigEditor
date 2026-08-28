@@ -17,11 +17,27 @@ Then open the URL Vite prints (usually `http://localhost:5173`) in Chrome, Edge,
 
 ## GitHub Pages
 
-The live site is at https://alternativesoap.github.io/SoapsConfigEditor/.
+The live site is at https://editor.soapsuniverse.com/ (also https://www.editor.soapsuniverse.com/ once DNS is set).
 
 In the repo **Settings → Pages**, set **Source** to **GitHub Actions**. Keep it on Actions (not “Deploy from a branch” from the repo root). The root `index.html` is for local Vite only and will break on Pages if published as-is.
 
+Under **Custom domain**, enter `editor.soapsuniverse.com`. GitHub allows one domain in the repo `CNAME` file; point `www.editor.soapsuniverse.com` at GitHub Pages in your DNS provider as well (see below).
+
 Pushes to `main` build the site and publish it automatically.
+
+### DNS (SoapsUniverse)
+
+At your DNS host for `soapsuniverse.com`:
+
+| Host | Type | Value |
+|------|------|-------|
+| `editor` | A | `185.199.108.153` |
+| `editor` | A | `185.199.109.153` |
+| `editor` | A | `185.199.110.153` |
+| `editor` | A | `185.199.111.153` |
+| `www.editor` | CNAME | `alternativesoap.github.io` |
+
+After DNS propagates, enable **Enforce HTTPS** on the Pages settings page.
 
 1. Click **Open Folder**.
 2. Choose your MythicMobs `Packs` folder, or any folder of YAML files.
