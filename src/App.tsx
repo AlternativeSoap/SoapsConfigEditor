@@ -77,8 +77,8 @@ import type {
 import { DEFAULT_SAVE_PREFS } from './types'
 import { DEFAULT_AC_PREFS } from './core/mythicmobs/autocomplete'
 import { CreateDialog } from './ui/CreateDialog'
-import { DependencyPanel } from './ui/DependencyPanel'
-import { PackIssuesPanel } from './ui/PackIssuesPanel'
+import { DependencyPanel, countFileDependencies } from './ui/DependencyPanel'
+import { PackIssuesPanel, countPackSidebarItems } from './ui/PackIssuesPanel'
 import { NewMenu } from './ui/NewMenu'
 import { NewPackDialog, type NewPackStartOptions } from './ui/NewPackDialog'
 import { AlertModal } from './ui/AlertModal'
@@ -91,7 +91,7 @@ import { ReagentWizardDialog } from './ui/mythicrpg/ReagentWizardDialog'
 import { SpellWizardDialog } from './ui/mythicrpg/SpellWizardDialog'
 import { QuestWizardDialog } from './ui/soapsquest/QuestWizardDialog'
 import { EditQuestPickerDialog } from './ui/soapsquest/EditQuestPickerDialog'
-import { QuestIssuesPanel } from './ui/soapsquest/QuestIssuesPanel'
+import { QuestIssuesPanel, countQuestIssues } from './ui/soapsquest/QuestIssuesPanel'
 import { ReferencePanel } from './ui/ReferencePanel'
 import { SettingsMenu } from './ui/SettingsMenu'
 import { TopbarFileMenu } from './ui/TopbarFileMenu'
@@ -143,9 +143,9 @@ function App() {
   const [refPanelHidden, setRefPanelHidden] = useState(
     () => localStorage.getItem('soaps-ref-hidden') === '1',
   )
-  const [depPanelOpen, setDepPanelOpen] = useState(true)
-  const [packIssuesOpen, setPackIssuesOpen] = useState(true)
-  const [questIssuesOpen, setQuestIssuesOpen] = useState(true)
+  const [depPanelOpen, setDepPanelOpen] = useState(false)
+  const [packIssuesOpen, setPackIssuesOpen] = useState(false)
+  const [questIssuesOpen, setQuestIssuesOpen] = useState(false)
   const [backupReady, setBackupReady] = useState(() => hasBackupFolder())
   const [acPrefs, setAcPrefs] = useState<AcPrefs>(() => {
     try {
@@ -421,9 +421,25 @@ function App() {
     return buildSoapsQuestCatalog(effectiveFiles)
   }, [isSoapsQuest, effectiveFiles, activePath])
 
+  const dependencyCount = useMemo(() => {
+    if (!isMythicMobs || !activeFile) return 0
+    const current = effectiveFiles.find((f) => f.path === activePath) ?? activeFile
+    return countFileDependencies(current, effectiveFiles)
+  }, [isMythicMobs, activeFile, effectiveFiles, activePath])
+
+  const packIssuesCount = useMemo(() => {
+    if (!isMythicMobs || files.length === 0) return 0
+    return countPackSidebarItems(effectiveFiles)
+  }, [isMythicMobs, files.length, effectiveFiles])
+
+  const questIssuesCount = useMemo(() => {
+    if (!isSoapsQuest || files.length === 0) return 0
+    return countQuestIssues(effectiveFiles)
+  }, [isSoapsQuest, files.length, effectiveFiles])
+
   const questsFileEntry = useMemo(() => {
     if (!isSoapsQuest) return null
-  return (
+    return (
       effectiveFiles.find((f) => {
         const n = f.path.replace(/\\/g, '/').toLowerCase()
         return n === 'quests.yml' || n.endsWith('/quests.yml')
@@ -1719,8 +1735,15 @@ function App() {
                 onClick={() => setDepPanelOpen((v) => !v)}
                 aria-expanded={depPanelOpen}
               >
-                <span className="chevron">{depPanelOpen ? '▾' : '▸'}</span>
-                Dependencies
+                <span className="dep-panel-toggle-label">
+                  <span className="chevron">{depPanelOpen ? '▾' : '▸'}</span>
+                  Dependencies
+                </span>
+                {dependencyCount > 0 ? (
+                  <span className="dep-panel-badge" aria-label={`${dependencyCount} dependencies`}>
+                    {dependencyCount}
+                  </span>
+                ) : null}
               </button>
               {depPanelOpen && (
                 <DependencyPanel
@@ -1743,8 +1766,15 @@ function App() {
                 onClick={() => setPackIssuesOpen((v) => !v)}
                 aria-expanded={packIssuesOpen}
               >
-                <span className="chevron">{packIssuesOpen ? '▾' : '▸'}</span>
-                Pack issues
+                <span className="dep-panel-toggle-label">
+                  <span className="chevron">{packIssuesOpen ? '▾' : '▸'}</span>
+                  Pack issues
+                </span>
+                {packIssuesCount > 0 ? (
+                  <span className="dep-panel-badge" aria-label={`${packIssuesCount} pack issues`}>
+                    {packIssuesCount}
+                  </span>
+                ) : null}
               </button>
               {packIssuesOpen && (
                 <PackIssuesPanel
@@ -1767,8 +1797,15 @@ function App() {
                 onClick={() => setQuestIssuesOpen((v) => !v)}
                 aria-expanded={questIssuesOpen}
               >
-                <span className="chevron">{questIssuesOpen ? '▾' : '▸'}</span>
-                Quest issues
+                <span className="dep-panel-toggle-label">
+                  <span className="chevron">{questIssuesOpen ? '▾' : '▸'}</span>
+                  Quest issues
+                </span>
+                {questIssuesCount > 0 ? (
+                  <span className="dep-panel-badge" aria-label={`${questIssuesCount} quest issues`}>
+                    {questIssuesCount}
+                  </span>
+                ) : null}
               </button>
               {questIssuesOpen && (
                 <QuestIssuesPanel

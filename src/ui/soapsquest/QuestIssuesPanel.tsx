@@ -15,6 +15,10 @@ const TYPE_LABEL: Record<QuestValidationIssue['type'], string> = {
   missing_quest_reference: 'Missing quest ref',
 }
 
+export function countQuestIssues(files: FileRecord[]): number {
+  return validateSoapsQuest(files).length
+}
+
 export function QuestIssuesPanel({ files, onNavigate }: QuestIssuesPanelProps) {
   const issues = useMemo(() => validateSoapsQuest(files), [files])
 

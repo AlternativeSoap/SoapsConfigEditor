@@ -18,6 +18,10 @@ const TYPE_LABEL: Record<ValidationIssue['type'], string> = {
   missing_augment_type_reference: 'Missing augment type',
 }
 
+export function countPackSidebarItems(files: FileRecord[]): number {
+  return validatePack(files).length + detectTemplateHints(files).length
+}
+
 export function PackIssuesPanel({ files, onNavigate, onApplyPatches }: PackIssuesPanelProps) {
   const issues = useMemo(() => validatePack(files), [files])
   const hints = useMemo(() => detectTemplateHints(files), [files])

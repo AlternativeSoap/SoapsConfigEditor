@@ -923,23 +923,32 @@ button.tree-row:active:not(:disabled) {
   background: var(--tree-hover);
 }
 
+/* Pack > category > file. Keep this order so nesting reads clearly. */
+.tree-row.pack,
 button.tree-row.pack {
   font-weight: 600;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   color: var(--text-primary);
   letter-spacing: 0.01em;
 }
 
+.tree-row.category,
 button.tree-row.category {
   padding-left: 0.75rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
+.tree-row.file,
 button.tree-row.file {
   padding-left: 1.35rem;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
+  font-weight: 400;
+  color: var(--text-secondary);
 }
 
+.tree-row.file.active,
 button.tree-row.file.active {
   background: var(--tree-active);
   color: var(--text-primary);
@@ -954,6 +963,7 @@ button.tree-row.file.active {
 }
 
 button.tree-row:hover .chevron,
+.tree-row.pack .chevron,
 button.tree-row.pack .chevron {
   opacity: 0.7;
 }
@@ -3226,7 +3236,8 @@ button.tree-row.pack .chevron {
 .dep-panel-toggle {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   background: transparent;
   border: none;
@@ -3240,6 +3251,29 @@ button.tree-row.pack .chevron {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   border-radius: 3px;
+}
+
+.dep-panel-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dep-panel-badge {
+  flex: 0 0 auto;
+  min-width: 1.15rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--text-primary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .dep-panel-toggle:hover {
@@ -3768,14 +3802,19 @@ button.active:not(.primary) {
   border: none;
   background: transparent;
   color: inherit;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
   text-align: left;
-  padding: 0.35rem 0.5rem 0.35rem 0;
+  padding: 0.28rem 0.5rem 0.28rem 0;
   cursor: pointer;
 }
 
-.tree-row.quest-entry {
+.tree-row.quest-entry,
+button.tree-row.quest-entry {
   padding-left: 2.25rem;
-  font-size: 0.92em;
+  font-size: 0.7rem;
   align-items: flex-start;
 }
 

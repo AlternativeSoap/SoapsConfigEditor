@@ -21,6 +21,11 @@ function shortPath(path: string): string {
   return parts.slice(-2).join('/')
 }
 
+export function countFileDependencies(activeFile: FileRecord, allFiles: FileRecord[]): number {
+  const deps = buildFileDeps(activeFile, allFiles)
+  return deps.uses.length + deps.usedBy.length
+}
+
 export function DependencyPanel({ activeFile, allFiles, onNavigate }: DependencyPanelProps) {
   const deps = useMemo(
     () => buildFileDeps(activeFile, allFiles),
