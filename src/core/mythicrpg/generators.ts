@@ -12,13 +12,36 @@ function listLines(raw: string): string[] {
     .filter(Boolean)
 }
 
+function reagentCostId(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return 'Mana'
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
+function modifierKeyName(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, '_')
+}
+
+function withAdditiveOp(line: string): string {
+  const trimmed = line.trim()
+  if (!trimmed) return trimmed
+  if (/\b(ADDITIVE|ADDITIVE_MULTIPLIER|MULTIPLY|COMPOUND)\b/i.test(trimmed)) {
+    return trimmed
+  }
+  return `${trimmed} ADDITIVE`
+}
+
+/**
+ * MythicRPG spell YAML matching current ExamplePack_RPG style:
+ * Trigger USE / COMBAT / JOIN, Icon as a material string, Cost as Mana{amount=…},
+ * and Modifiers referenced via <spell.mod.SPELL_ID.key>.
+ */
 export function generateSpellYaml(input: SpellGeneratorInput): string {
   const id = input.id.trim()
   const lines: string[] = [`${id}:`]
+  const modId = id
 
-  if (input.cooldown > 0) {
-    lines.push(`  Cooldown: ${input.cooldown}`)
-  }
+  lines.push('  Spell: true')
   lines.push(`  Display: ${yamlQuoted(input.display.trim() || id)}`)
 
   const descLines = listLines(input.description)
@@ -30,26 +53,25 @@ export function generateSpellYaml(input: SpellGeneratorInput): string {
   }
 
   if (input.iconMaterial.trim()) {
-    lines.push('  Icon:')
-    lines.push(`    Material: ${input.iconMaterial.trim().toUpperCase()}`)
+    lines.push(`  Icon: ${input.iconMaterial.trim().toUpperCase()}`)
   }
 
-  lines.push('  Spell: true')
-
-  if (input.global || input.castingMode === 'passive') {
-    lines.push('  Global: true')
-  }
+  const powerKey = modifierKeyName(input.modifierKey)
+  const hasCost = Boolean(input.costReagent.trim() && input.costAmount > 0)
+  const hasCooldown = input.cooldown > 0
+  const hasPower = Boolean(powerKey) && input.castingMode !== 'passive'
 
   if (input.castingMode === 'bound') {
-    lines.push('  Bindable: true')
-    lines.push('  Trigger: ~onUse')
+    lines.push('  Type: ACTIVE')
+    lines.push('  Trigger: USE')
   } else if (input.castingMode === 'click_combo') {
     const combo = input.clickCombo.trim().toUpperCase() || 'LRR'
+    lines.push('  Type: ACTIVE')
     lines.push(`  ClickCombo: ${combo}`)
-    lines.push('  Trigger: ~onCombat')
+    lines.push('  Trigger: COMBAT')
   } else {
-    lines.push('  Bindable: false')
-    lines.push('  Trigger: ~onJoin')
+    lines.push('  Global: true')
+    lines.push('  Trigger: JOIN')
   }
 
   if (input.targeter.trim()) {
@@ -60,22 +82,37 @@ export function generateSpellYaml(input: SpellGeneratorInput): string {
     lines.push(`  Upgrades: ${input.upgrades}`)
   }
 
-  const reagent = input.costReagent.trim()
-  if (reagent && input.costAmount > 0) {
-    lines.push('  Cost:')
-    lines.push(`  - ${reagent.toLowerCase()} ${input.costAmount}`)
+  if (hasCooldown || hasCost || hasPower) {
+    lines.push('  Modifiers:')
+    if (hasCooldown) {
+      lines.push('    cooldown:')
+      lines.push(`      Base: ${input.cooldown}`)
+      lines.push('      PerLevel: 0')
+    }
+    if (hasCost) {
+      lines.push('    cost:')
+      lines.push(`      Base: ${input.costAmount}`)
+      lines.push('      PerLevel: 0')
+    }
+    if (hasPower) {
+      lines.push(`    ${powerKey}:`)
+      lines.push(`      Base: ${input.modifierBase}`)
+      lines.push(`      PerLevel: ${input.modifierPerLevel}`)
+    }
   }
 
-  const modKey = input.modifierKey.trim().toUpperCase()
-  if (modKey) {
-    lines.push('  Modifiers:')
-    lines.push(`    ${modKey}:`)
-    lines.push(`      Base: ${input.modifierBase}`)
-    lines.push(`      PerLevel: ${input.modifierPerLevel}`)
+  if (hasCooldown) {
+    lines.push(`  Cooldown: <spell.mod.${modId}.cooldown>`)
+  }
+
+  if (hasCost) {
+    const reagent = reagentCostId(input.costReagent)
+    lines.push('  Cost:')
+    lines.push(`  - ${reagent}{amount=<spell.mod.${modId}.cost>}`)
   }
 
   const statKey = input.passiveStatKey?.trim().toUpperCase()
-  if (statKey) {
+  if (statKey && input.castingMode === 'passive') {
     lines.push('  Stats:')
     lines.push(`    ${statKey}:`)
     lines.push(`      Base: ${input.passiveStatBase ?? 1}`)
@@ -89,6 +126,13 @@ export function generateSpellYaml(input: SpellGeneratorInput): string {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
+    .map((line) =>
+      powerKey
+        ? line
+            .replaceAll(`<spell.modifier.${input.modifierKey.trim().toUpperCase()}>`, `<spell.mod.${modId}.${powerKey}>`)
+            .replaceAll(`<spell.modifier.${powerKey}>`, `<spell.mod.${modId}.${powerKey}>`)
+        : line,
+    )
   if (skillLines.length === 0) {
     lines.push('  Skills: []')
   } else {
@@ -101,6 +145,10 @@ export function generateSpellYaml(input: SpellGeneratorInput): string {
   return `${lines.join('\n')}\n`
 }
 
+/**
+ * MythicRPG archetype YAML matching ExamplePack_RPG:
+ * Bindings for hotbar spells, PointRewards, StatModifiers with ADDITIVE ops.
+ */
 export function generateArchetypeYaml(input: ArchetypeGeneratorInput): string {
   const id = input.id.trim()
   const lines: string[] = [`${id}:`]
@@ -130,21 +178,39 @@ export function generateArchetypeYaml(input: ArchetypeGeneratorInput): string {
     lines.push(`    ExperienceSource: ${input.experienceSource.trim()}`)
   }
 
+  if (input.group === 'CLASS') {
+    lines.push('  PointRewards:')
+    lines.push('  - Type: TALENT')
+    lines.push('    PerLevel: 1')
+    lines.push('  - Type: ATTRIBUTE')
+    lines.push('    PerLevel: 1')
+  }
+
+  const bindings = listLines(input.spellUnlocks)
+  if (bindings.length > 0) {
+    lines.push('  Bindings:')
+    bindings.forEach((entry, index) => {
+      const slotMatch = entry.match(/^(\d+)\s+(.+)$/)
+      if (slotMatch) {
+        lines.push(`  - ${slotMatch[1]} ${slotMatch[2]}`)
+      } else {
+        lines.push(`  - ${index + 1} ${entry}`)
+      }
+    })
+  }
+
   if (input.baseStatLine.trim()) {
     lines.push('  BaseStats:')
     lines.push(`  - ${input.baseStatLine.trim()}`)
   }
   if (input.statModifierLine.trim()) {
     lines.push('  StatModifiers:')
-    lines.push(`  - ${input.statModifierLine.trim()}`)
+    lines.push(`  - ${withAdditiveOp(input.statModifierLine)}`)
   }
 
-  const unlocks = listLines(input.spellUnlocks)
-  if (unlocks.length > 0) {
-    lines.push('  SpellUnlocks:')
-    for (const unlock of unlocks) {
-      lines.push(`  - ${unlock}`)
-    }
+  if (input.group === 'CLASS') {
+    lines.push('  InitSkills:')
+    lines.push('  - modifyresource{resource=Mana;stat=MAX_MANA} @self')
   }
 
   return `${lines.join('\n')}\n`
@@ -157,7 +223,10 @@ export function generateReagentYaml(input: ReagentGeneratorInput): string {
   lines.push(`  MinValue: ${input.minValue.trim() || '0'}`)
   const maxValue = input.scaleWithMaxMana ? 'stat.MAX_MANA' : input.maxValue.trim() || '100'
   lines.push(`  MaxValue: ${maxValue}`)
-  lines.push(`  Global: ${input.global ? 'true' : 'false'}`)
+  if (input.global) {
+    // Official Mana reagent omits Global; keep it when the wizard asks for it.
+    lines.push('  Global: true')
+  }
 
   if (input.includeResourceBar) {
     lines.push('  ResourceBarStates:')
@@ -171,15 +240,47 @@ export function generateReagentYaml(input: ReagentGeneratorInput): string {
   return `${lines.join('\n')}\n`
 }
 
+/** MAX_MANA stat stub matching ExamplePack_RPG (PlayerBaseValue + Type STATIC). */
 export function generateMaxManaStatYaml(baseValue: number): string {
   return `MAX_MANA:
   Enabled: true
+  Type: STATIC
+  AlwaysActive: true
   Display: ${yamlQuoted('Max Mana')}
-  BaseValue: ${baseValue}
+  PlayerBaseValue: ${baseValue}
+  MinValue: 0
+  MaxValue: 1000000
   Formatting:
-    Additive: ${yamlQuoted('+<value> Max Mana')}
-    Multiply: ${yamlQuoted('+<value> Max Mana')}
-    Compound: ${yamlQuoted('x<value> Max Mana')}
+    Additive: ${yamlQuoted('<white>+<value> Max Mana')}
+    Multiply: ${yamlQuoted('<white>+<value>% Max Mana')}
+    Compound: ${yamlQuoted('<white>x<value> Max Mana')}
+    Rounding: 2
+`
+}
+
+export function generateManaRegenStatYaml(baseValue = 2): string {
+  return `MANA_REGENERATION:
+  Enabled: true
+  Type: STATIC
+  AlwaysActive: true
+  Display: ${yamlQuoted('Mana Regeneration')}
+  PlayerBaseValue: ${baseValue}
+  MinValue: 0
+  MaxValue: 1000000
+  Formatting:
+    Additive: ${yamlQuoted('<white>+<value> Mana Regeneration')}
+    Multiply: ${yamlQuoted('<white>+<value>% Mana Regeneration')}
+    Compound: ${yamlQuoted('<white>x<value> Mana Regeneration')}
+    Rounding: 2
+`
+}
+
+export function generatePointsYaml(): string {
+  return `TALENT:
+  Display: ${yamlQuoted('<gold>Talent Point')}
+
+ATTRIBUTE:
+  Display: ${yamlQuoted('<green>Attribute Point')}
 `
 }
 

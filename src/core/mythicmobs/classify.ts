@@ -41,6 +41,12 @@ export function classifyMythicCategory(filePath: string): MythicCategory {
   if (baseName === 'experience-sources.yml' || baseName.startsWith('experience-sources.')) {
     return 'experience-sources'
   }
+  if (baseName === 'talents.yml' || baseName.startsWith('talents.')) {
+    return 'talents'
+  }
+  if (baseName === 'points.yml' || baseName.startsWith('points.')) {
+    return 'points'
+  }
   if (baseName === 'packinfo.yml' || baseName.startsWith('packinfo.')) {
     return 'packinfo'
   }

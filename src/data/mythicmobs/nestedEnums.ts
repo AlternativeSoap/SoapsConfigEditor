@@ -18,13 +18,13 @@ export const BOSS_BAR_STYLES = [
   'SEGMENTED_20',
 ] as const
 
-/** MythicRPG experience source Types. */
+/** MythicRPG experience source Types (ExamplePack_RPG / current plugin). */
 export const EXPERIENCE_SOURCE_TYPES = [
-  'killEntity',
-  'castSpell',
-  'blockBreak',
-  'fish',
-  'custom',
+  'KILL_ENTITY',
+  'CAST_SPELL',
+  'BLOCK_BREAK',
+  'FISH',
+  'CUSTOM',
 ] as const
 
 /** Experience curve types. */

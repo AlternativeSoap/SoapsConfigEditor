@@ -53,19 +53,22 @@ export const SKILL_BODY_DEFS: BodyKeyDef[] = [
 
 /** MythicRPG spell keys (same skills/ folder as metaskills). */
 export const SPELL_BODY_DEFS: BodyKeyDef[] = [
+  boolKey('Spell', true, 'Mark as MythicRPG spell'),
   quotedKey('Display', 'Spell display name'),
   listDashKey('Description', 'Description lines', '"Short description"'),
-  mapKey('Icon', 'Spell icon', 4),
-  boolKey('Spell', true, 'Mark as MythicRPG spell'),
-  boolKey('Global', false, 'Cast without binding'),
-  boolKey('Bindable', true, 'Player can bind spell'),
-  scalarKey('Trigger', 'Cast trigger (~onUse)'),
+  scalarKey('Icon', 'Icon material (IRON_SWORD)'),
+  scalarKey('Type', 'ACTIVE for castable spells'),
+  boolKey('Global', false, 'Always available'),
+  scalarKey('Trigger', 'USE, COMBAT, JOIN, TIMER:20, ATTACK, DAMAGED'),
   scalarKey('ClickCombo', 'Click combo (LRR)'),
   scalarKey('Targeter', 'Default targeter'),
   scalarKey('Upgrades', 'Max upgrade level'),
-  mapKey('Cost', 'Reagent costs', 4),
-  mapKey('Modifiers', 'Spell modifiers', 4),
-  mapKey('Stats', 'Passive stats', 4),
+  mapKey('Modifiers', 'cooldown / cost / power modifiers', 4),
+  scalarKey('Cooldown', 'Seconds or <spell.mod.ID.cooldown>'),
+  listDashKey('Cost', 'Reagent costs', 'Mana{amount=<spell.mod.ID.cost>}'),
+  listDashKey('Conditions', 'Cast conditions'),
+  listDashKey('TriggerConditions', 'Trigger filter conditions'),
+  mapKey('Stats', 'Passive stats (legacy)', 4),
 ]
 
 /** MythicLib skill registration keys (plugins/MythicLib/skill/). */
@@ -116,20 +119,25 @@ export const RANDOMSPAWN_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const ARCHETYPE_BODY_DEFS: BodyKeyDef[] = [
-  scalarKey('Group', 'Archetype group'),
+  scalarKey('Group', 'CLASS or PROFESSION'),
+  scalarKey('Category', 'Optional menu category'),
   quotedKey('Display', 'Display name'),
+  scalarKey('DisplayOrder', 'Menu sort order'),
   listDashKey('Description', 'Description lines', '"Short description"'),
   mapKey('Icon', 'Icon block', 4),
   mapKey('Leveling', 'Level settings', 4),
-  listDashKey('BaseStats', 'Base stat lines', 'STRENGTH 1'),
-  listDashKey('StatModifiers', 'Stat modifier lines', 'STRENGTH +1'),
-  listDashKey('SpellUnlocks', 'Spell unlock lines', 'MySpell 1'),
+  listDashKey('PointRewards', 'Points granted while leveling', 'Type: TALENT'),
+  listDashKey('Bindings', 'Hotbar spell bindings', '1 MY_SPELL'),
+  listDashKey('BaseStats', 'Base stat lines', "MAX_MANA '40 + 4*L'"),
+  listDashKey('StatModifiers', 'Stat modifier lines', 'HEALTH 6 ADDITIVE'),
+  listDashKey('InitSkills', 'Skills run on archetype select', 'modifyresource{resource=Mana;stat=MAX_MANA} @self'),
+  mapKey('TalentTree', 'Class talent tree', 4),
 ]
 
 export const REAGENT_BODY_DEFS: BodyKeyDef[] = [
   quotedKey('Display', 'Display name'),
   scalarKey('MinValue', 'Minimum value'),
-  scalarKey('MaxValue', 'Maximum value'),
+  scalarKey('MaxValue', 'Maximum value or stat.MAX_MANA'),
   boolKey('Global', false, 'Shared reagent'),
   mapKey('ResourceBarStates', 'Resource bar UI', 4),
 ]
@@ -150,9 +158,15 @@ export const AUGMENT_BODY_DEFS: BodyKeyDef[] = [
 
 export const STAT_BODY_DEFS: BodyKeyDef[] = [
   boolKey('Enabled', true, 'Stat enabled'),
+  scalarKey('Type', 'STATIC or MUTATOR'),
+  boolKey('AlwaysActive', true, 'Always applied'),
   quotedKey('Display', 'Display name'),
-  scalarKey('BaseValue', 'Base value'),
+  scalarKey('PlayerBaseValue', 'Base value for players'),
+  scalarKey('BaseValue', 'Legacy base value'),
+  scalarKey('MinValue', 'Minimum'),
+  scalarKey('MaxValue', 'Maximum'),
   mapKey('Formatting', 'Format strings', 4),
+  mapKey('Components', 'Mutator components', 4),
 ]
 
 export const EXPERIENCE_CURVE_BODY_DEFS: BodyKeyDef[] = [
@@ -161,7 +175,22 @@ export const EXPERIENCE_CURVE_BODY_DEFS: BodyKeyDef[] = [
 ]
 
 export const EXPERIENCE_SOURCE_BODY_DEFS: BodyKeyDef[] = [
+  quotedKey('Message', 'XP gain message'),
   mapKey('Sources', 'XP source list', 2),
+]
+
+export const TALENT_BODY_DEFS: BodyKeyDef[] = [
+  quotedKey('Display', 'Tree display name'),
+  listDashKey('Description', 'Description lines'),
+  mapKey('Icon', 'Icon block', 4),
+  scalarKey('PointType', 'TALENT or ATTRIBUTE'),
+  scalarKey('Menu', 'Menu id under Menus/'),
+  boolKey('TalentsForgettable', true, 'Allow refunds'),
+  mapKey('Talents', 'Talent nodes', 4),
+]
+
+export const POINT_BODY_DEFS: BodyKeyDef[] = [
+  quotedKey('Display', 'Point display name'),
 ]
 
 export const QUEST_BODY_DEFS: BodyKeyDef[] = [
@@ -280,6 +309,8 @@ export function bodyKeyIndentForCategory(category?: MythicCategory): number | nu
     case 'experience-curves':
     case 'exp-curves':
     case 'experience-sources':
+    case 'talents':
+    case 'points':
     case 'other':
       return 2
     case 'quests':
@@ -348,6 +379,10 @@ export function bodyKeyDefsForCategory(
       return EXPERIENCE_CURVE_BODY_DEFS
     case 'experience-sources':
       return EXPERIENCE_SOURCE_BODY_DEFS
+    case 'talents':
+      return TALENT_BODY_DEFS
+    case 'points':
+      return POINT_BODY_DEFS
     case 'quests':
       return QUEST_BODY_DEFS
     case 'tiers':

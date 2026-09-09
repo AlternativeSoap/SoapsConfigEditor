@@ -45,6 +45,8 @@ export type MythicCategory =
   | 'stats'
   | 'experience-curves'
   | 'experience-sources'
+  | 'talents'
+  | 'points'
   | 'tiers'
   | 'difficulties'
   | 'elements'
@@ -377,11 +379,14 @@ export interface ArchetypeGeneratorInput {
   maxLevel: number
   experienceCurve: string
   experienceSource: string
-  /** Newline or comma separated spell unlock lines. */
+  /**
+   * Hotbar bindings (one per line). Use SPELL or SLOT SPELL.
+   * Written as Bindings on the archetype (ExamplePack_RPG style).
+   */
   spellUnlocks: string
-  /** Single BaseStats line, e.g. MAX_HEALTH 18 or MAX_MANA '50 + 5*L' */
+  /** Single BaseStats line, e.g. MAX_MANA '50 + 5*L' */
   baseStatLine: string
-  /** Single StatModifiers line, e.g. MAX_HEALTH 1 */
+  /** Single StatModifiers line, e.g. HEALTH 6 (ADDITIVE is appended when missing) */
   statModifierLine: string
 }
 

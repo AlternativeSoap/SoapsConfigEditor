@@ -16,37 +16,46 @@ describe('mythicrpg generators', () => {
     const yaml = generateSpellYaml(SPELL_PRESETS[0].apply())
     expect(yaml).toContain('MAGIC_MISSILE:')
     expect(yaml).toContain('Spell: true')
-    expect(yaml).toContain('Bindable: true')
-    expect(yaml).toContain('Trigger: ~onUse')
-    expect(yaml).toContain('mana 40')
-    expect(yaml).toContain('DAMAGE:')
+    expect(yaml).toContain('Type: ACTIVE')
+    expect(yaml).toContain('Trigger: USE')
+    expect(yaml).toContain('Icon: NETHER_STAR')
+    expect(yaml).toContain('Mana{amount=<spell.mod.MAGIC_MISSILE.cost>}')
+    expect(yaml).toContain('damage:')
+    expect(yaml).toContain('<spell.mod.MAGIC_MISSILE.damage>')
   })
 
-  it('generates a Wizard archetype', () => {
+  it('generates a Wizard archetype with Bindings', () => {
     const yaml = generateArchetypeYaml(ARCHETYPE_PRESETS[0]!.apply())
     expect(yaml).toContain('Wizard:')
     expect(yaml).toContain('Group: CLASS')
     expect(yaml).toContain('ExperienceSource: SPELLCASTING')
-    expect(yaml).toContain('SpellUnlocks:')
-    expect(yaml).toContain('MAGIC_MISSILE')
+    expect(yaml).toContain('Bindings:')
+    expect(yaml).toContain('1 MAGIC_MISSILE')
+    expect(yaml).toContain('PointRewards:')
+    expect(yaml).toContain('InitSkills:')
+    expect(yaml).not.toContain('SpellUnlocks:')
   })
 
   it('generates mana reagent and max mana stat', () => {
     const reagent = generateReagentYaml(REAGENT_PRESETS[0].apply())
     expect(reagent).toContain('Mana:')
     expect(reagent).toContain('MaxValue: stat.MAX_MANA')
-    expect(reagent).toContain('Global: true')
-    const stat = generateMaxManaStatYaml(1000)
+    expect(reagent).not.toContain('Global:')
+    const stat = generateMaxManaStatYaml(100)
     expect(stat).toContain('MAX_MANA:')
-    expect(stat).toContain('BaseValue: 1000')
+    expect(stat).toContain('PlayerBaseValue: 100')
+    expect(stat).toContain('Type: STATIC')
+    expect(stat).not.toMatch(/^\s*BaseValue:/m)
   })
 })
 
 describe('mythicrpg classify and scaffold', () => {
-  it('classifies archetypes and reagents folders', () => {
+  it('classifies archetypes, reagents, talents, and points', () => {
     expect(classifyMythicCategory('Packs/Demo/Archetypes/classes.yml')).toBe('archetypes')
     expect(classifyMythicCategory('Packs/Demo/reagents.yml')).toBe('reagents')
     expect(classifyMythicCategory('Packs/Demo/Reagents/mana.yml')).toBe('reagents')
+    expect(classifyMythicCategory('Packs/Demo/talents.yml')).toBe('talents')
+    expect(classifyMythicCategory('Packs/Demo/points.yml')).toBe('points')
   })
 
   it('scaffolds RPG files when MythicRPG addon is on', () => {
@@ -56,8 +65,15 @@ describe('mythicrpg classify and scaffold', () => {
     })
     expect(files.some((f) => f.path.includes('Archetypes/classes.yml'))).toBe(true)
     expect(files.some((f) => f.path.endsWith('reagents.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('stats.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('points.yml'))).toBe(true)
+    expect(files.some((f) => f.path.endsWith('talents.yml'))).toBe(true)
     expect(files.some((f) => f.path.endsWith('experience-curves.yml'))).toBe(true)
     expect(files.some((f) => f.path.endsWith('experience-sources.yml'))).toBe(true)
+    const sources = files.find((f) => f.path.endsWith('experience-sources.yml'))?.content ?? ''
+    expect(sources).toContain('Type: KILL_ENTITY')
+    expect(sources).toContain('Type: CAST_SPELL')
+    expect(sources).toContain('Type: BLOCK_BREAK')
   })
 
   it('does not scaffold RPG files when MythicRPG addon is off', () => {

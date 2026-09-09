@@ -359,10 +359,9 @@ export const MOB_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
 }
 
 export const SPELL_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
-  Icon: mapBlock('Icon', [scalarKey('Material', 'Icon material')], 4),
-  Modifiers: mapBlock('Modifiers', [scalarKey('DAMAGE', 'Modifier block')], 4),
+  Modifiers: mapBlock('Modifiers', [scalarKey('damage', 'modifier block')], 4),
   Stats: mapBlock('Stats', [scalarKey('STRENGTH', 'Stat block')], 4),
-  Cost: listDashBlock('Cost', ['mana 10'], (t) => t, 'Reagent cost line', 4),
+  Cost: listDashBlock('Cost', ['Mana{amount=10}'], (t) => t, 'Reagent cost line', 2),
 }
 
 export const ARCHETYPE_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
@@ -375,9 +374,23 @@ export const ARCHETYPE_NESTED_BLOCKS: Record<string, NestedBlockDef> = {
     'Description line',
     2,
   ),
-  BaseStats: listDashBlock('BaseStats', ['STRENGTH 1'], (t) => t, 'Base stat line', 2),
-  StatModifiers: listDashBlock('StatModifiers', ['STRENGTH +1'], (t) => t, 'Stat modifier line', 2),
-  SpellUnlocks: listDashBlock('SpellUnlocks', ['MySpell 1'], (t) => t, 'Spell unlock line', 2),
+  PointRewards: listDashBlock('PointRewards', ['Type: TALENT'], (t) => t, 'Point reward block', 2),
+  Bindings: listDashBlock('Bindings', ['1 MY_SPELL'], (t) => t, 'Hotbar binding', 2),
+  BaseStats: listDashBlock('BaseStats', ["MAX_MANA '40 + 4*L'"], (t) => t, 'Base stat line', 2),
+  StatModifiers: listDashBlock(
+    'StatModifiers',
+    ['HEALTH 6 ADDITIVE'],
+    (t) => t,
+    'Stat modifier line',
+    2,
+  ),
+  InitSkills: listDashBlock(
+    'InitSkills',
+    ['modifyresource{resource=Mana;stat=MAX_MANA} @self'],
+    (t) => t,
+    'Init skill line',
+    2,
+  ),
 }
 
 export const STAT_NESTED_BLOCKS: Record<string, NestedBlockDef> = {

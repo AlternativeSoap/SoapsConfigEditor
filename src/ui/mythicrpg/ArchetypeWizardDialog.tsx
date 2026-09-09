@@ -10,12 +10,12 @@ import type { ArchetypeGeneratorInput, FileRecord } from '../../types'
 import { ColorTextField } from '../ColorTextField'
 import { DialogBody, DialogFooter, DialogHeader, DialogPanel, DialogPreviewBlock, DialogShell } from '../DialogShell'
 
-const STEPS = ['Identity', 'Progression', 'Unlocks'] as const
+const STEPS = ['Identity', 'Progression', 'Bindings'] as const
 
 const STEP_HINTS = [
   'Pick class or profession, then set the display name and icon.',
   'Set level range and which experience curve and source this archetype uses.',
-  'Optionally unlock spells at certain levels and add one base or modifier stat line.',
+  'Assign hotbar spell bindings and optional base or modifier stats.',
 ]
 
 const emptyArchetype = (): ArchetypeGeneratorInput => ({
@@ -26,8 +26,8 @@ const emptyArchetype = (): ArchetypeGeneratorInput => ({
   iconMaterial: 'IRON_SWORD',
   minLevel: 1,
   maxLevel: 50,
-  experienceCurve: 'STANDARD',
-  experienceSource: 'COMBAT',
+  experienceCurve: 'RPG_LEVEL_50',
+  experienceSource: 'RPG_COMBAT',
   spellUnlocks: '',
   baseStatLine: '',
   statModifierLine: '',
@@ -288,14 +288,14 @@ export function ArchetypeWizardDialog({
           )}
 
           {step === 2 && (
-            <DialogPanel title="Unlocks">
+            <DialogPanel title="Bindings">
               <label className="wz-field">
-                Spell unlocks
+                Hotbar bindings
                 <textarea
                   rows={3}
                   value={input.spellUnlocks}
                   onChange={(e) => patch({ spellUnlocks: e.target.value })}
-                  placeholder={'MagicMissile\nFireball 5'}
+                  placeholder={'MAGIC_MISSILE\n2 HEAL_SELF'}
                 />
               </label>
               {skillIds.length > 0 ? (
@@ -305,14 +305,15 @@ export function ArchetypeWizardDialog({
                 </p>
               ) : null}
               <p className="dialog-note">
-                One unlock per line. Use SPELL, SPELL level, or SPELL:spellLevel archetypeLevel.
+                One binding per line. Use SPELL or SLOT SPELL. Class archetypes also get PointRewards and an InitSkills
+                mana sync line.
               </p>
               <label className="wz-field">
                 Base stats line (optional)
                 <input
                   value={input.baseStatLine}
                   onChange={(e) => patch({ baseStatLine: e.target.value })}
-                  placeholder="MAX_HEALTH 18"
+                  placeholder="MAX_MANA '50 + 5*L'"
                 />
               </label>
               <label className="wz-field">
@@ -320,7 +321,7 @@ export function ArchetypeWizardDialog({
                 <input
                   value={input.statModifierLine}
                   onChange={(e) => patch({ statModifierLine: e.target.value })}
-                  placeholder="MAX_HEALTH 1"
+                  placeholder="HEALTH 6 ADDITIVE"
                 />
               </label>
               <label className="wz-field">

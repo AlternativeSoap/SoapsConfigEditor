@@ -28,7 +28,8 @@ export type YamlListParent =
   | 'Description'
   | 'BaseStats'
   | 'StatModifiers'
-  | 'SpellUnlocks'
+  | 'Bindings'
+  | 'InitSkills'
   | null
 
 export interface YamlEditContext {
@@ -55,7 +56,8 @@ const PARENT_KEY_ALIASES: Record<string, YamlListParent> = {
   description: 'Description',
   basestats: 'BaseStats',
   statmodifiers: 'StatModifiers',
-  spellunlocks: 'SpellUnlocks',
+  bindings: 'Bindings',
+  initskills: 'InitSkills',
 }
 
 /** Normalize YAML parent keys to canonical MythicMobs casing (skills → Skills). */
@@ -99,7 +101,8 @@ const LIST_DASH_PARENTS = new Set<YamlListParent>([
   'Description',
   'BaseStats',
   'StatModifiers',
-  'SpellUnlocks',
+  'Bindings',
+  'InitSkills',
 ])
 
 function isListDashSectionKey(key: string): boolean {

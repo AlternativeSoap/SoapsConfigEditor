@@ -15,8 +15,8 @@ const STEPS = ['Identity', 'Casting', 'Cost and power'] as const
 
 const STEP_HINTS = [
   'Name the spell and choose an icon. Presets fill the form with a working starting point.',
-  'Choose how players cast this spell: bound hotbar, click combo, or a global passive.',
-  'Set cooldown, optional reagent cost, power scaling, and skill lines.',
+  'Choose how players cast this spell: bound hotbar (Trigger USE), click combo, or a global passive.',
+  'Set cooldown, optional Mana cost, power scaling, and skill lines. Costs write as Mana{amount=…}.',
 ]
 
 const emptySpell = (): SpellGeneratorInput => ({
@@ -279,8 +279,8 @@ export function SpellWizardDialog({
                 />
               </label>
               <p className="dialog-note">
-                Bound spells use ~onUse after the player binds them. Click combos fire on combat clicks. Passive
-                global spells are granted to every player.
+                Bound spells use Trigger USE and are assigned on the class with Bindings. Click combos fire on combat
+                clicks. Passive global spells use Trigger JOIN.
               </p>
             </DialogPanel>
           )}
