@@ -66,6 +66,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const [graph, setGraph] = useState<DialogGraph>(() => createQuestOfferGraph())
   const [selectedId, setSelectedId] = useState<string | null>(() => graph.entryBubbleId)
   const [showYaml, setShowYaml] = useState(false)
+  const [yamlExpanded, setYamlExpanded] = useState(false)
+  const yamlExpandedRef = useRef(false)
+  yamlExpandedRef.current = yamlExpanded
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -115,6 +118,11 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && yamlExpandedRef.current) {
+        e.preventDefault()
+        setYamlExpanded(false)
+        return
+      }
       if (e.code === 'Escape' && connectRef.current) {
         e.preventDefault()
         setConnect(null)
@@ -925,19 +933,63 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
         {showYaml ? (
           <aside className="dw-yaml" aria-label="YAML preview">
-            <h3 className="dw-yaml-title">Live YAML</h3>
-            <pre>{compiled.dialogYaml}</pre>
-            {compiled.skillsYaml.includes('showdialog') ? (
-              <>
-                <h3 className="dw-yaml-title">Link skills</h3>
-                <pre>{compiled.skillsYaml}</pre>
-              </>
-            ) : null}
+            <div className="dw-yaml-head">
+              <h3 className="dw-yaml-title">Live YAML</h3>
+              <button
+                type="button"
+                className="dw-mini"
+                onClick={() => setYamlExpanded(true)}
+              >
+                View all
+              </button>
+            </div>
+            <div className="dw-yaml-scroll">
+              <pre>{compiled.dialogYaml}</pre>
+              {compiled.skillsYaml.includes('showdialog') ? (
+                <>
+                  <h3 className="dw-yaml-title">Link skills</h3>
+                  <pre>{compiled.skillsYaml}</pre>
+                </>
+              ) : null}
+            </div>
           </aside>
+        ) : null}
+
+        {showYaml && yamlExpanded ? (
+          <div className="dw-yaml-expanded" role="dialog" aria-label="Full YAML preview">
+            <div className="dw-yaml-expanded-bar">
+              <h3 className="dw-yaml-title">Live YAML</h3>
+              <button
+                type="button"
+                className="dw-mini"
+                onClick={() => setYamlExpanded(false)}
+              >
+                Collapse
+              </button>
+            </div>
+            <div className="dw-yaml-expanded-scroll">
+              <pre>{compiled.dialogYaml}</pre>
+              {compiled.skillsYaml.includes('showdialog') ? (
+                <>
+                  <h3 className="dw-yaml-title">Link skills</h3>
+                  <pre>{compiled.skillsYaml}</pre>
+                </>
+              ) : null}
+            </div>
+          </div>
         ) : null}
       </DialogBody>
       <DialogFooter className="dw-footer">
-        <button type="button" className="ghost" onClick={() => setShowYaml((v) => !v)}>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => {
+            setShowYaml((v) => {
+              if (v) setYamlExpanded(false)
+              return !v
+            })
+          }}
+        >
           {showYaml ? 'Hide YAML' : 'Preview YAML'}
         </button>
         <button type="button" className="ghost" onClick={onClose}>Cancel</button>
