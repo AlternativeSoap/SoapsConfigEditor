@@ -103,7 +103,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const pinnedIdRef = useRef(pinnedId)
   pinnedIdRef.current = pinnedId
   const [status, setStatus] = useState(
-    'Drag empty canvas to pan. Use the dots on a bubble to connect screens. Scroll to zoom.',
+    'Double-click empty canvas to add a bubble. Drag to pan. Use dots to connect. Scroll to zoom.',
   )
   const canvasRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
@@ -229,7 +229,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     }))
   }
 
-  const addBubble = () => {
+  const addBubble = (at?: { x: number; y: number }) => {
     const idBase = `Screen${graph.nodes.length + 1}`
     const used = new Set(graph.nodes.map((n) => n.dialogId.toLowerCase()))
     let dialogId = sanitizeDialogId(idBase)
@@ -238,7 +238,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
       dialogId = sanitizeDialogId(`${idBase}_${i}`)
       i += 1
     }
-    const bubble = createBubble(180 - pan.x / scale, 160 - pan.y / scale, dialogId)
+    const x = at?.x ?? 180 - panRef.current.x / scaleRef.current
+    const y = at?.y ?? 160 - panRef.current.y / scaleRef.current
+    const bubble = createBubble(x, y, dialogId)
     const next = { ...graph, nodes: [...graph.nodes, bubble] }
     if (!next.entryBubbleId) next.entryBubbleId = bubble.id
     pushHistory(next)
@@ -683,6 +685,13 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
             applyWorldTransform(nextPan.x, nextPan.y, next)
             setPan(nextPan)
             setScale(next)
+          }}
+          onDoubleClick={(e) => {
+            if (isInteractiveTarget(e.target) || connectDrag || spaceHeld) return
+            e.preventDefault()
+            const pt = clientToCanvas(e.clientX, e.clientY)
+            // Place so the click lands near the bubble center.
+            addBubble({ x: pt.x - BUBBLE_W / 2, y: pt.y - 48 })
           }}
         >
           <div ref={worldRef} className="dw-world">
