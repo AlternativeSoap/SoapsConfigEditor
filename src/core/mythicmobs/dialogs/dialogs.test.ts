@@ -19,10 +19,27 @@ describe('compileDialogGraph', () => {
     expect(compiled.dialogYaml).toContain('QuestOffer:')
     expect(compiled.dialogYaml).toContain('QuestAccepted:')
     expect(compiled.dialogYaml).toContain('Buttons:')
+    expect(compiled.dialogYaml).toContain('Tooltip:')
+    expect(compiled.dialogYaml).toContain('CanClose:')
+    expect(compiled.dialogYaml).toContain('AfterAction:')
     expect(compiled.skillsYaml).toContain('showdialog{dialog=QuestAccepted}')
     expect(compiled.skillsYaml).toContain('showdialog{dialog=QuestDeclined}')
     expect(compiled.attachSkillLine).toContain('showdialog{dialog=QuestOffer}')
     expect(compiled.dialogFileName).toContain('dialog')
+  })
+
+  it('emits ExitButton and custom option Skill when set', () => {
+    const g = createEmptyGraph('Notice')
+    const node = g.nodes[0]!
+    node.exitButton = { label: 'Close', width: 100 }
+    node.options = [
+      { key: 'run', label: '<green>Run', width: 150, skillId: 'DoSomething', isEnd: true },
+    ]
+    const compiled = compileDialogGraph(g)
+    expect(compiled.dialogYaml).toContain('ExitButton:')
+    expect(compiled.dialogYaml).toContain('Label: "Close"')
+    expect(compiled.dialogYaml).toContain('Skill: DoSomething')
+    expect(compiled.skillsYaml).not.toContain('showdialog{')
   })
 
   it('skips glue skills for end options with no edge', () => {

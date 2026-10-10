@@ -5,10 +5,15 @@ import {
   createEmptyGraph,
   newOptionKey,
   sanitizeDialogId,
+  type DialogAfterAction,
   type DialogBubble,
   type DialogGraph,
   type DialogOption,
 } from '../../core/mythicmobs/dialogs/types'
+
+function stripMm(text: string): string {
+  return text.replace(/<[^>]+>/g, '')
+}
 import { resolveCreateFolder } from '../../core/mythicmobs/createTarget'
 import type { FileRecord, PackIndex } from '../../types'
 import { DialogBody, DialogFooter, DialogHeader, DialogShell } from '../DialogShell'
@@ -64,6 +69,8 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const [past, setPast] = useState<HistoryEntry[]>([])
   const [future, setFuture] = useState<HistoryEntry[]>([])
   const [attachMobId, setAttachMobId] = useState('')
+  /** Option chosen on a bubble before clicking the out-dot (so the edge maps to the right button). */
+  const [preferredOption, setPreferredOption] = useState<{ bubbleId: string; key: string } | null>(null)
   const [status, setStatus] = useState(
     'Drag empty canvas to pan. Use the dots on a bubble to connect screens. Scroll to zoom.',
   )
@@ -76,7 +83,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
   const isInteractiveTarget = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return false
-    return Boolean(target.closest('.dw-bubble, .dw-dot, .dw-popout, .dw-empty button'))
+    return Boolean(
+      target.closest('.dw-bubble, .dw-dot, .dw-popout, .dw-option-chip, .dw-empty button'),
+    )
   }
 
   const setConnect = (next: ConnectDrag | null) => {
@@ -263,7 +272,11 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
     pushHistory({ ...graph, nodes, edges })
     setConnect(null)
-    setStatus(`Connected ${from.dialogId} → ${to.dialogId}.`)
+    const optLabel =
+      nodes
+        .find((n) => n.id === link.fromBubbleId)
+        ?.options.find((o) => o.key === link.optionKey)?.label ?? link.optionKey
+    setStatus(`Connected “${stripMm(optLabel)}” from ${from.dialogId} → ${to.dialogId}.`)
   }
 
   const beginConnectFrom = (bubble: DialogBubble, e: React.PointerEvent) => {
@@ -273,7 +286,14 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const linked = new Set(
       graph.edges.filter((ed) => ed.fromBubbleId === bubble.id).map((ed) => ed.optionKey),
     )
-    const free = bubble.options.find((o) => !linked.has(o.key))
+    const preferred =
+      preferredOption?.bubbleId === bubble.id
+        ? bubble.options.find((o) => o.key === preferredOption.key)
+        : undefined
+    const free =
+      preferred && !linked.has(preferred.key)
+        ? preferred
+        : bubble.options.find((o) => !linked.has(o.key))
     const pt = clientToCanvas(e.clientX, e.clientY)
     if (free) {
       setConnect({
@@ -282,6 +302,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
         x: pt.x,
         y: pt.y,
       })
+      setStatus(
+        `Connecting “${stripMm(free.label) || free.key}”. Click another bubble to finish. Esc cancels.`,
+      )
     } else {
       const key = newOptionKey(`Option${bubble.options.length + 1}`, bubble.options.map((o) => o.key))
       const newOption: DialogOption = { key, label: `<green>${key}`, width: 150 }
@@ -292,9 +315,10 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
         x: pt.x,
         y: pt.y,
       })
+      setStatus('Connecting a new option. Click another bubble to finish. Esc cancels.')
     }
+    setPreferredOption(null)
     setSelectedId(bubble.id)
-    setStatus('Click another bubble to finish the connection. Esc cancels.')
   }
 
   const onBubblePointerDown = (e: React.PointerEvent, bubble: DialogBubble) => {
@@ -434,8 +458,22 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const x2 = to.x
     const y2 = to.y + BUBBLE_ANCHOR_Y
     const mx = (x1 + x2) / 2
-    return { edge, d: `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}` }
-  }).filter(Boolean) as { edge: (typeof graph.edges)[0]; d: string }[]
+    const opt = from.options.find((o) => o.key === edge.optionKey)
+    const label = stripMm(opt?.label ?? edge.optionKey) || edge.optionKey
+    return {
+      edge,
+      d: `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`,
+      label,
+      lx: (x1 + x2) / 2,
+      ly: (y1 + y2) / 2 - 8,
+    }
+  }).filter(Boolean) as {
+    edge: (typeof graph.edges)[0]
+    d: string
+    label: string
+    lx: number
+    ly: number
+  }[]
 
   const connectFrom = connectDrag
     ? graph.nodes.find((n) => n.id === connectDrag.fromBubbleId)
@@ -547,8 +585,8 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
         >
           <div ref={worldRef} className="dw-world">
             <svg className="dw-edges" aria-hidden>
-              {edgePaths.map(({ edge, d }) => (
-                <g key={edge.id}>
+              {edgePaths.map(({ edge, d, label, lx, ly }) => (
+                <g key={edge.id} className="dw-edge-group">
                   <path
                     d={d}
                     className="dw-edge"
@@ -557,6 +595,17 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                       deleteEdgeAt(edge.id)
                     }}
                   />
+                  <rect
+                    className="dw-edge-label-bg"
+                    x={lx - Math.min(54, 6 + label.length * 3.2)}
+                    y={ly - 9}
+                    width={Math.min(108, 12 + label.length * 6.4)}
+                    height={18}
+                    rx={6}
+                  />
+                  <text className="dw-edge-label" x={lx} y={ly + 4} textAnchor="middle">
+                    {label.length > 16 ? `${label.slice(0, 15)}…` : label}
+                  </text>
                 </g>
               ))}
               {connectDrag && connectFrom ? (
@@ -618,17 +667,68 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                     <span className="dw-bubble-id">{bubble.dialogId}</span>
                     {isEntry ? <span className="dw-badge">Entry</span> : null}
                   </div>
-                  <p className="dw-bubble-title">{bubble.title.replace(/<[^>]+>/g, '')}</p>
+                  <p className="dw-bubble-title">{stripMm(bubble.title)}</p>
                   <p className="dw-bubble-preview">
                     {bubble.body[0]?.type === 'text'
-                      ? bubble.body[0].message.replace(/<[^>]+>/g, '')
+                      ? stripMm(bubble.body[0].message)
                       : 'Item body'}
                   </p>
                   {bubble.options.length > 0 ? (
                     <ul className="dw-option-chips" aria-label="Options">
-                      {bubble.options.map((opt) => (
-                        <li key={opt.key}>{opt.label.replace(/<[^>]+>/g, '') || opt.key}</li>
-                      ))}
+                      {bubble.options.map((opt) => {
+                        const link = graph.edges.find(
+                          (ed) => ed.fromBubbleId === bubble.id && ed.optionKey === opt.key,
+                        )
+                        const target = link
+                          ? graph.nodes.find((n) => n.id === link.toBubbleId)
+                          : null
+                        const preferred =
+                          preferredOption?.bubbleId === bubble.id &&
+                          preferredOption.key === opt.key
+                        const chipLabel = stripMm(opt.label) || opt.key
+                        return (
+                          <li key={opt.key}>
+                            <button
+                              type="button"
+                              className={[
+                                'dw-option-chip',
+                                link ? 'linked' : '',
+                                preferred ? 'preferred' : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')}
+                              title={
+                                target
+                                  ? `Goes to ${target.dialogId}. Click to reconnect this option.`
+                                  : `Click to select, then use the right-side dot to connect.`
+                              }
+                              onPointerDown={(e) => {
+                                e.stopPropagation()
+                                e.preventDefault()
+                                setSelectedId(bubble.id)
+                                setPreferredOption({ bubbleId: bubble.id, key: opt.key })
+                                const pt = clientToCanvas(e.clientX, e.clientY)
+                                setConnect({
+                                  fromBubbleId: bubble.id,
+                                  optionKey: opt.key,
+                                  x: pt.x,
+                                  y: pt.y,
+                                })
+                                setStatus(
+                                  link
+                                    ? `Reconnecting “${chipLabel}”. Click another bubble, or Esc to keep the current link.`
+                                    : `Connecting “${chipLabel}”. Click another bubble to finish. Esc cancels.`,
+                                )
+                              }}
+                            >
+                              {chipLabel}
+                              {target ? (
+                                <span className="dw-chip-target">→ {target.dialogId}</span>
+                              ) : null}
+                            </button>
+                          </li>
+                        )
+                      })}
                     </ul>
                   ) : null}
 
@@ -679,35 +779,103 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                           aria-label="Mark as entry screen"
                         />
                       </div>
+                      <div className="dw-popout-row">
+                        <span>Allow ESC close</span>
+                        <Switch
+                          checked={bubble.canClose}
+                          onChange={(on) => updateBubble(bubble.id, { canClose: on })}
+                          aria-label="Allow ESC close"
+                        />
+                      </div>
+                      <label>
+                        After button click
+                        <select
+                          value={bubble.afterAction}
+                          onChange={(e) =>
+                            updateBubble(bubble.id, {
+                              afterAction: e.target.value as DialogAfterAction,
+                            })
+                          }
+                        >
+                          <option value="CLOSE">Close dialog</option>
+                          <option value="NONE">Keep open (NONE)</option>
+                          <option value="WAIT_FOR_RESPONSE">Wait for response</option>
+                        </select>
+                      </label>
+                      <label>
+                        Exit button label
+                        <input
+                          value={bubble.exitButton?.label ?? ''}
+                          placeholder="Optional, e.g. Close"
+                          onChange={(e) => {
+                            const label = e.target.value
+                            patchBubbleLive(bubble.id, {
+                              exitButton: label.trim()
+                                ? { label, width: bubble.exitButton?.width ?? 100, skillId: bubble.exitButton?.skillId }
+                                : null,
+                            })
+                          }}
+                        />
+                      </label>
                       <div className="dw-options-edit">
-                        <span className="dw-options-label">Options</span>
+                        <span className="dw-options-label">Buttons</span>
                         {bubble.options.map((opt, oi) => (
-                          <div key={opt.key} className="dw-option-row">
+                          <div key={opt.key} className="dw-option-block">
+                            <div className="dw-option-row">
+                              <input
+                                value={opt.label}
+                                aria-label={`Button label ${opt.key}`}
+                                placeholder="Label"
+                                onChange={(e) => {
+                                  const options = bubble.options.map((o, i) =>
+                                    i === oi ? { ...o, label: e.target.value } : o,
+                                  )
+                                  patchBubbleLive(bubble.id, { options })
+                                }}
+                              />
+                              <RemoveButton
+                                size="sm"
+                                aria-label={`Remove option ${opt.key}`}
+                                onClick={() => {
+                                  pushHistory({
+                                    ...graph,
+                                    nodes: graph.nodes.map((n) =>
+                                      n.id === bubble.id
+                                        ? { ...n, options: n.options.filter((o) => o.key !== opt.key) }
+                                        : n,
+                                    ),
+                                    edges: graph.edges.filter(
+                                      (ed) =>
+                                        !(ed.fromBubbleId === bubble.id && ed.optionKey === opt.key),
+                                    ),
+                                  })
+                                }}
+                              />
+                            </div>
                             <input
-                              value={opt.label}
+                              className="dw-option-meta"
+                              value={opt.tooltip ?? ''}
+                              placeholder="Tooltip"
+                              aria-label={`Tooltip for ${opt.key}`}
                               onChange={(e) => {
                                 const options = bubble.options.map((o, i) =>
-                                  i === oi ? { ...o, label: e.target.value } : o,
+                                  i === oi ? { ...o, tooltip: e.target.value } : o,
                                 )
                                 patchBubbleLive(bubble.id, { options })
                               }}
                             />
-                            <RemoveButton
-                              size="sm"
-                              aria-label={`Remove option ${opt.key}`}
-                              onClick={() => {
-                                pushHistory({
-                                  ...graph,
-                                  nodes: graph.nodes.map((n) =>
-                                    n.id === bubble.id
-                                      ? { ...n, options: n.options.filter((o) => o.key !== opt.key) }
-                                      : n,
-                                  ),
-                                  edges: graph.edges.filter(
-                                    (ed) =>
-                                      !(ed.fromBubbleId === bubble.id && ed.optionKey === opt.key),
-                                  ),
-                                })
+                            <input
+                              className="dw-option-meta"
+                              value={opt.skillId ?? ''}
+                              placeholder="Custom skill (optional)"
+                              aria-label={`Skill for ${opt.key}`}
+                              onChange={(e) => {
+                                const options = bubble.options.map((o, i) =>
+                                  i === oi
+                                    ? { ...o, skillId: e.target.value.trim() || undefined }
+                                    : o,
+                                )
+                                patchBubbleLive(bubble.id, { options })
                               }}
                             />
                           </div>

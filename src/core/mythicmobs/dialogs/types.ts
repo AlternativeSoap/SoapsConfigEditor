@@ -30,6 +30,13 @@ export interface DialogOption {
   isEnd?: boolean
 }
 
+/** Optional Mythic ExitButton block */
+export interface DialogExitButton {
+  label: string
+  width?: number
+  skillId?: string
+}
+
 export interface DialogBubble {
   id: string
   /** Mythic dialog definition id written to YAML */
@@ -44,6 +51,7 @@ export interface DialogBubble {
   columns: number
   body: DialogBodyElement[]
   options: DialogOption[]
+  exitButton?: DialogExitButton | null
 }
 
 export interface DialogEdge {

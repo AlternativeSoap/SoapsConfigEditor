@@ -80,6 +80,14 @@ function emitBubbleYaml(
     }
   }
 
+  const exit = bubble.exitButton
+  if (exit?.label?.trim()) {
+    lines.push('  ExitButton:')
+    lines.push(`    Label: ${yamlQuoted(exit.label.trim())}`)
+    lines.push(`    Width: ${exit.width ?? 100}`)
+    if (exit.skillId?.trim()) lines.push(`    Skill: ${exit.skillId.trim()}`)
+  }
+
   return lines.join('\n') + '\n'
 }
 
