@@ -98,10 +98,8 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const [attachMobId, setAttachMobId] = useState('')
   /** Option chosen on a bubble before clicking the out-dot (so the edge maps to the right button). */
   const [preferredOption, setPreferredOption] = useState<{ bubbleId: string; key: string } | null>(null)
-  /** Keeps the settings popout open while panning or selecting other bubbles. */
-  const [pinnedId, setPinnedId] = useState<string | null>(null)
-  const pinnedIdRef = useRef(pinnedId)
-  pinnedIdRef.current = pinnedId
+  /** Bubbles whose settings stay open (multiple locks allowed). */
+  const [pinnedIds, setPinnedIds] = useState<string[]>([])
   const [status, setStatus] = useState(
     'Double-click empty canvas to add a bubble. Drag to pan. Use dots to connect. Scroll to zoom.',
   )
@@ -279,9 +277,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
       nodes: g.nodes.filter((n) => n.id !== id),
       edges: g.edges.filter((e) => e.fromBubbleId !== id && e.toBubbleId !== id),
     })
-    setSelectedId(null)
+    setSelectedId((cur) => (cur === id ? null : cur))
     setPreferredOption(null)
-    setPinnedId((p) => (p === id ? null : p))
+    setPinnedIds((ids) => ids.filter((p) => p !== id))
     setConnect(null)
     setStatus('Bubble removed.')
   }
@@ -292,12 +290,17 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     removeBubble(selected.id)
   }
 
-  const clearSelectionIfUnlocked = () => {
-    if (pinnedIdRef.current) return
-    setSelectedId(null)
+  const togglePin = (id: string) => {
+    setPinnedIds((ids) => {
+      if (ids.includes(id)) {
+        setStatus('Settings unlocked for this bubble.')
+        return ids.filter((p) => p !== id)
+      }
+      setStatus('Settings locked open. You can still open and lock other bubbles.')
+      return [...ids, id]
+    })
+    setSelectedId(id)
   }
-
-  const settingsId = pinnedId ?? selectedId
 
   const clientToCanvas = (clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
@@ -597,7 +600,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
             onClick={() => {
               pushHistory(createEmptyGraph())
               setSelectedId(null)
-              setPinnedId(null)
+              setPinnedIds([])
             }}
           >
             Clear canvas
@@ -609,7 +612,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
               const g = createQuestOfferGraph()
               pushHistory(g)
               setSelectedId(g.entryBubbleId)
-              setPinnedId(null)
+              setPinnedIds([])
             }}
           >
             Quest template
@@ -657,7 +660,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
               e.preventDefault()
               setConnect(null)
               setStatus('Connection cancelled.')
-              clearSelectionIfUnlocked()
+              setSelectedId(null)
               return
             }
             const wantPan =
@@ -674,7 +677,8 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
               panX: panRef.current.x,
               panY: panRef.current.y,
             })
-            if (!spaceHeld) clearSelectionIfUnlocked()
+            // Clear selection only; locked settings stay open.
+            if (!spaceHeld) setSelectedId(null)
           }}
           onWheel={(e) => {
             e.preventDefault()
@@ -751,8 +755,8 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
             {graph.nodes.map((bubble) => {
               const isSel = bubble.id === selectedId
-              const isPinned = pinnedId === bubble.id
-              const showSettings = bubble.id === settingsId
+              const isPinned = pinnedIds.includes(bubble.id)
+              const showSettings = isPinned || isSel
               const isEntry = bubble.id === graph.entryBubbleId
               const isSource = connectDrag?.fromBubbleId === bubble.id
               return (
@@ -768,7 +772,11 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  style={{ left: bubble.x, top: bubble.y, zIndex: showSettings ? 4 : undefined }}
+                  style={{
+                    left: bubble.x,
+                    top: bubble.y,
+                    zIndex: isSel ? 5 : showSettings ? 4 : undefined,
+                  }}
                   onPointerDown={(e) => onBubblePointerDown(e, bubble)}
                 >
                   <button
@@ -878,18 +886,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                           title={
                             isPinned
                               ? 'Unlock so this panel can close'
-                              : 'Lock this panel open while you work'
+                              : 'Lock this panel open. Other bubbles can stay locked too.'
                           }
-                          onClick={() => {
-                            if (isPinned) {
-                              setPinnedId(null)
-                              setStatus('Settings unlocked.')
-                            } else {
-                              setPinnedId(bubble.id)
-                              setSelectedId(bubble.id)
-                              setStatus('Settings locked open. Pan or select other bubbles freely.')
-                            }
-                          }}
+                          onClick={() => togglePin(bubble.id)}
                         >
                           <LockIcon locked={isPinned} />
                         </button>
