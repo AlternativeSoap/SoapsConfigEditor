@@ -4844,8 +4844,10 @@ button.tree-row.quest-entry {
   position: absolute;
   left: 0;
   top: calc(100% + 12px);
-  width: 248px;
-  padding: 0.7rem;
+  width: 380px;
+  max-width: min(380px, 70vw);
+  max-height: min(52vh, 460px);
+  padding: 0.7rem 0.75rem;
   border-radius: 12px;
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
@@ -4856,10 +4858,76 @@ button.tree-row.quest-entry {
   -webkit-backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.5rem;
+  overflow: auto;
+  overscroll-behavior: contain;
   cursor: default;
   z-index: 5;
   animation: dw-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dw-popout.is-locked {
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 55%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #8b7cf8) 22%, transparent),
+    0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset,
+    0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+.dw-bubble.pinned {
+  z-index: 4;
+}
+
+.dw-popout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dw-popout-heading {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dw-lock-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  background: color-mix(in srgb, var(--surface-inset, var(--surface)) 80%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.dw-lock-btn:hover {
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 45%, transparent);
+  color: var(--text);
+}
+
+.dw-lock-btn.active {
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 55%, transparent);
+  background: color-mix(in srgb, var(--accent, #8b7cf8) 18%, transparent);
+  color: var(--accent, #8b7cf8);
+}
+
+.dw-popout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 0.55rem;
+  align-items: start;
+}
+
+.dw-popout-grid .dw-span-2 {
+  grid-column: 1 / -1;
 }
 
 @keyframes dw-pop {
@@ -4952,6 +5020,12 @@ button.tree-row.quest-entry {
 
 .dw-option-row input {
   flex: 1;
+}
+
+.dw-option-meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
 }
 
 .dw-option-meta {

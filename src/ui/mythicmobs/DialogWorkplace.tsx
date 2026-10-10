@@ -14,6 +14,24 @@ import {
 function stripMm(text: string): string {
   return text.replace(/<[^>]+>/g, '')
 }
+
+function LockIcon({ locked }: { locked: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d={
+          locked
+            ? 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6V11Z'
+            : 'M7 11V8a5 5 0 0 1 9.9-1M6 11h12v10H6V11Z'
+        }
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 import { resolveCreateFolder } from '../../core/mythicmobs/createTarget'
 import type { FileRecord, PackIndex } from '../../types'
 import { DialogBody, DialogFooter, DialogHeader, DialogShell } from '../DialogShell'
@@ -80,6 +98,10 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const [attachMobId, setAttachMobId] = useState('')
   /** Option chosen on a bubble before clicking the out-dot (so the edge maps to the right button). */
   const [preferredOption, setPreferredOption] = useState<{ bubbleId: string; key: string } | null>(null)
+  /** Keeps the settings popout open while panning or selecting other bubbles. */
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
+  const pinnedIdRef = useRef(pinnedId)
+  pinnedIdRef.current = pinnedId
   const [status, setStatus] = useState(
     'Drag empty canvas to pan. Use the dots on a bubble to connect screens. Scroll to zoom.',
   )
@@ -89,6 +111,11 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const scaleRef = useRef(scale)
   const panRafRef = useRef(0)
   const connectRef = useRef<ConnectDrag | null>(null)
+  const selectedIdRef = useRef(selectedId)
+  selectedIdRef.current = selectedId
+  const graphRef = useRef(graph)
+  graphRef.current = graph
+  const deleteBubbleRef = useRef<(id: string) => void>(() => {})
 
   const isInteractiveTarget = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return false
@@ -117,6 +144,12 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   }, [pan, scale, panning, applyWorldTransform])
 
   useEffect(() => {
+    const isTypingTarget = (t: EventTarget | null) =>
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement ||
+      (t instanceof HTMLElement && t.isContentEditable)
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape' && yamlExpandedRef.current) {
         e.preventDefault()
@@ -129,9 +162,15 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
         setStatus('Connection cancelled.')
         return
       }
+      if ((e.code === 'Delete' || e.key === 'Delete') && !e.repeat && !isTypingTarget(e.target)) {
+        const id = selectedIdRef.current
+        if (!id) return
+        e.preventDefault()
+        deleteBubbleRef.current(id)
+        return
+      }
       if (e.code !== 'Space' || e.repeat) return
-      const t = e.target
-      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return
+      if (isTypingTarget(e.target)) return
       e.preventDefault()
       setSpaceHeld(true)
     }
@@ -219,18 +258,34 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     setStatus('Option added. Connect this bubble with the right-side dot when you are ready.')
   }
 
-  const deleteSelected = () => {
-    if (!selected) return
-    const id = selected.id
+  const removeBubble = (id: string) => {
+    const g = graphRef.current
+    if (!g.nodes.some((n) => n.id === id)) return
     pushHistory({
-      ...graph,
-      entryBubbleId: graph.entryBubbleId === id ? null : graph.entryBubbleId,
-      nodes: graph.nodes.filter((n) => n.id !== id),
-      edges: graph.edges.filter((e) => e.fromBubbleId !== id && e.toBubbleId !== id),
+      ...g,
+      entryBubbleId: g.entryBubbleId === id ? null : g.entryBubbleId,
+      nodes: g.nodes.filter((n) => n.id !== id),
+      edges: g.edges.filter((e) => e.fromBubbleId !== id && e.toBubbleId !== id),
     })
     setSelectedId(null)
+    setPreferredOption(null)
+    setPinnedId((p) => (p === id ? null : p))
+    setConnect(null)
     setStatus('Bubble removed.')
   }
+  deleteBubbleRef.current = removeBubble
+
+  const deleteSelected = () => {
+    if (!selected) return
+    removeBubble(selected.id)
+  }
+
+  const clearSelectionIfUnlocked = () => {
+    if (pinnedIdRef.current) return
+    setSelectedId(null)
+  }
+
+  const settingsId = pinnedId ?? selectedId
 
   const clientToCanvas = (clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
@@ -524,10 +579,27 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
           <button type="button" className="dw-tool" onClick={deleteSelected} disabled={!selected}>Delete bubble</button>
           <button type="button" className="dw-tool" onClick={undo} disabled={past.length === 0}>Undo</button>
           <button type="button" className="dw-tool" onClick={redo} disabled={future.length === 0}>Redo</button>
-          <button type="button" className="dw-tool" onClick={() => { pushHistory(createEmptyGraph()); setSelectedId(null) }}>
+          <button
+            type="button"
+            className="dw-tool"
+            onClick={() => {
+              pushHistory(createEmptyGraph())
+              setSelectedId(null)
+              setPinnedId(null)
+            }}
+          >
             Clear canvas
           </button>
-          <button type="button" className="dw-tool" onClick={() => { const g = createQuestOfferGraph(); pushHistory(g); setSelectedId(g.entryBubbleId) }}>
+          <button
+            type="button"
+            className="dw-tool"
+            onClick={() => {
+              const g = createQuestOfferGraph()
+              pushHistory(g)
+              setSelectedId(g.entryBubbleId)
+              setPinnedId(null)
+            }}
+          >
             Quest template
           </button>
           <hr className="dw-sep" />
@@ -573,7 +645,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
               e.preventDefault()
               setConnect(null)
               setStatus('Connection cancelled.')
-              setSelectedId(null)
+              clearSelectionIfUnlocked()
               return
             }
             const wantPan =
@@ -590,7 +662,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
               panX: panRef.current.x,
               panY: panRef.current.y,
             })
-            if (!spaceHeld) setSelectedId(null)
+            if (!spaceHeld) clearSelectionIfUnlocked()
           }}
           onWheel={(e) => {
             e.preventDefault()
@@ -660,6 +732,8 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
             {graph.nodes.map((bubble) => {
               const isSel = bubble.id === selectedId
+              const isPinned = pinnedId === bubble.id
+              const showSettings = bubble.id === settingsId
               const isEntry = bubble.id === graph.entryBubbleId
               const isSource = connectDrag?.fromBubbleId === bubble.id
               return (
@@ -668,13 +742,14 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                   className={[
                     'dw-bubble',
                     isSel ? 'selected' : '',
+                    isPinned ? 'pinned' : '',
                     isEntry ? 'entry' : '',
                     isSource ? 'is-connect-source' : '',
                     connectDrag && !isSource ? 'is-connect-target' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  style={{ left: bubble.x, top: bubble.y }}
+                  style={{ left: bubble.x, top: bubble.y, zIndex: showSettings ? 4 : undefined }}
                   onPointerDown={(e) => onBubblePointerDown(e, bubble)}
                 >
                   <button
@@ -767,91 +842,123 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                     </ul>
                   ) : null}
 
-                  {isSel ? (
+                  {showSettings ? (
                     <div
-                      className="dw-popout"
+                      className={`dw-popout ${isPinned ? 'is-locked' : ''}`}
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="dw-popout-caret" aria-hidden />
-                      <label>
-                        Dialog id
-                        <input
-                          value={bubble.dialogId}
-                          onChange={(e) =>
-                            patchBubbleLive(bubble.id, { dialogId: sanitizeDialogId(e.target.value) })
+                      <div className="dw-popout-head">
+                        <span className="dw-popout-heading">Screen settings</span>
+                        <button
+                          type="button"
+                          className={`dw-lock-btn ${isPinned ? 'active' : ''}`}
+                          aria-label={isPinned ? 'Unlock settings panel' : 'Lock settings panel open'}
+                          aria-pressed={isPinned}
+                          title={
+                            isPinned
+                              ? 'Unlock so this panel can close'
+                              : 'Lock this panel open while you work'
                           }
-                        />
-                      </label>
-                      <label>
-                        Title
-                        <input
-                          value={bubble.title}
-                          onChange={(e) => patchBubbleLive(bubble.id, { title: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Body text
-                        <textarea
-                          rows={3}
-                          value={
-                            bubble.body[0]?.type === 'text' ? bubble.body[0].message : ''
-                          }
-                          onChange={(e) =>
-                            patchBubbleLive(bubble.id, {
-                              body: [{ type: 'text', message: e.target.value, width: 280 }],
-                            })
-                          }
-                        />
-                      </label>
-                      <div className="dw-popout-row">
-                        <span>Entry screen</span>
-                        <Switch
-                          checked={graph.entryBubbleId === bubble.id}
-                          onChange={(on) =>
-                            pushHistory({ ...graph, entryBubbleId: on ? bubble.id : null })
-                          }
-                          aria-label="Mark as entry screen"
-                        />
-                      </div>
-                      <div className="dw-popout-row">
-                        <span>Allow ESC close</span>
-                        <Switch
-                          checked={bubble.canClose}
-                          onChange={(on) => updateBubble(bubble.id, { canClose: on })}
-                          aria-label="Allow ESC close"
-                        />
-                      </div>
-                      <label>
-                        After button click
-                        <select
-                          value={bubble.afterAction}
-                          onChange={(e) =>
-                            updateBubble(bubble.id, {
-                              afterAction: e.target.value as DialogAfterAction,
-                            })
-                          }
-                        >
-                          <option value="CLOSE">Close dialog</option>
-                          <option value="NONE">Keep open (NONE)</option>
-                          <option value="WAIT_FOR_RESPONSE">Wait for response</option>
-                        </select>
-                      </label>
-                      <label>
-                        Exit button label
-                        <input
-                          value={bubble.exitButton?.label ?? ''}
-                          placeholder="Optional, e.g. Close"
-                          onChange={(e) => {
-                            const label = e.target.value
-                            patchBubbleLive(bubble.id, {
-                              exitButton: label.trim()
-                                ? { label, width: bubble.exitButton?.width ?? 100, skillId: bubble.exitButton?.skillId }
-                                : null,
-                            })
+                          onClick={() => {
+                            if (isPinned) {
+                              setPinnedId(null)
+                              setStatus('Settings unlocked.')
+                            } else {
+                              setPinnedId(bubble.id)
+                              setSelectedId(bubble.id)
+                              setStatus('Settings locked open. Pan or select other bubbles freely.')
+                            }
                           }}
-                        />
-                      </label>
+                        >
+                          <LockIcon locked={isPinned} />
+                        </button>
+                      </div>
+                      <div className="dw-popout-grid">
+                        <label>
+                          Dialog id
+                          <input
+                            value={bubble.dialogId}
+                            onChange={(e) =>
+                              patchBubbleLive(bubble.id, { dialogId: sanitizeDialogId(e.target.value) })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Title
+                          <input
+                            value={bubble.title}
+                            onChange={(e) => patchBubbleLive(bubble.id, { title: e.target.value })}
+                          />
+                        </label>
+                        <label className="dw-span-2">
+                          Body text
+                          <textarea
+                            rows={2}
+                            value={
+                              bubble.body[0]?.type === 'text' ? bubble.body[0].message : ''
+                            }
+                            onChange={(e) =>
+                              patchBubbleLive(bubble.id, {
+                                body: [{ type: 'text', message: e.target.value, width: 280 }],
+                              })
+                            }
+                          />
+                        </label>
+                        <div className="dw-popout-row">
+                          <span>Entry screen</span>
+                          <Switch
+                            checked={graph.entryBubbleId === bubble.id}
+                            onChange={(on) =>
+                              pushHistory({ ...graph, entryBubbleId: on ? bubble.id : null })
+                            }
+                            aria-label="Mark as entry screen"
+                          />
+                        </div>
+                        <div className="dw-popout-row">
+                          <span>Allow ESC close</span>
+                          <Switch
+                            checked={bubble.canClose}
+                            onChange={(on) => updateBubble(bubble.id, { canClose: on })}
+                            aria-label="Allow ESC close"
+                          />
+                        </div>
+                        <label>
+                          After button click
+                          <select
+                            value={bubble.afterAction}
+                            onChange={(e) =>
+                              updateBubble(bubble.id, {
+                                afterAction: e.target.value as DialogAfterAction,
+                              })
+                            }
+                          >
+                            <option value="CLOSE">Close dialog</option>
+                            <option value="NONE">Keep open (NONE)</option>
+                            <option value="WAIT_FOR_RESPONSE">Wait for response</option>
+                          </select>
+                        </label>
+                        <label>
+                          Exit button label
+                          <input
+                            value={bubble.exitButton?.label ?? ''}
+                            placeholder="Optional, e.g. Close"
+                            onChange={(e) => {
+                              const label = e.target.value
+                              patchBubbleLive(bubble.id, {
+                                exitButton: label.trim()
+                                  ? {
+                                      label,
+                                      width: bubble.exitButton?.width ?? 100,
+                                      skillId: bubble.exitButton?.skillId,
+                                    }
+                                  : null,
+                              })
+                            }}
+                          />
+                        </label>
+                      </div>
                       <div className="dw-options-edit">
                         <span className="dw-options-label">Buttons</span>
                         {bubble.options.map((opt, oi) => (
@@ -887,32 +994,34 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                                 }}
                               />
                             </div>
-                            <input
-                              className="dw-option-meta"
-                              value={opt.tooltip ?? ''}
-                              placeholder="Tooltip"
-                              aria-label={`Tooltip for ${opt.key}`}
-                              onChange={(e) => {
-                                const options = bubble.options.map((o, i) =>
-                                  i === oi ? { ...o, tooltip: e.target.value } : o,
-                                )
-                                patchBubbleLive(bubble.id, { options })
-                              }}
-                            />
-                            <input
-                              className="dw-option-meta"
-                              value={opt.skillId ?? ''}
-                              placeholder="Custom skill (optional)"
-                              aria-label={`Skill for ${opt.key}`}
-                              onChange={(e) => {
-                                const options = bubble.options.map((o, i) =>
-                                  i === oi
-                                    ? { ...o, skillId: e.target.value.trim() || undefined }
-                                    : o,
-                                )
-                                patchBubbleLive(bubble.id, { options })
-                              }}
-                            />
+                            <div className="dw-option-meta-row">
+                              <input
+                                className="dw-option-meta"
+                                value={opt.tooltip ?? ''}
+                                placeholder="Tooltip"
+                                aria-label={`Tooltip for ${opt.key}`}
+                                onChange={(e) => {
+                                  const options = bubble.options.map((o, i) =>
+                                    i === oi ? { ...o, tooltip: e.target.value } : o,
+                                  )
+                                  patchBubbleLive(bubble.id, { options })
+                                }}
+                              />
+                              <input
+                                className="dw-option-meta"
+                                value={opt.skillId ?? ''}
+                                placeholder="Custom skill"
+                                aria-label={`Skill for ${opt.key}`}
+                                onChange={(e) => {
+                                  const options = bubble.options.map((o, i) =>
+                                    i === oi
+                                      ? { ...o, skillId: e.target.value.trim() || undefined }
+                                      : o,
+                                  )
+                                  patchBubbleLive(bubble.id, { options })
+                                }}
+                              />
+                            </div>
                           </div>
                         ))}
                         <button type="button" className="dw-mini" onClick={addOption}>Add option</button>
