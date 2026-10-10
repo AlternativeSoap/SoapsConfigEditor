@@ -4569,27 +4569,39 @@ button.tree-row.quest-entry {
   pointer-events: none;
 }
 
+.dw-edge-group {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.dw-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+  stroke-linecap: round;
+  pointer-events: stroke;
+}
+
 .dw-edge {
   fill: none;
   stroke: color-mix(in srgb, var(--accent, #8b7cf8) 88%, #fff);
   stroke-width: 3;
   stroke-linecap: round;
-  pointer-events: stroke;
-  cursor: pointer;
+  pointer-events: none;
 }
 
 .dw-edge-label-bg {
-  fill: color-mix(in srgb, var(--panel) 88%, transparent);
-  stroke: color-mix(in srgb, var(--accent, #8b7cf8) 40%, transparent);
+  fill: color-mix(in srgb, var(--panel) 92%, #000);
+  stroke: color-mix(in srgb, var(--accent, #8b7cf8) 55%, transparent);
   stroke-width: 1;
-  pointer-events: none;
+  pointer-events: all;
 }
 
 .dw-edge-label {
-  fill: var(--text);
+  fill: #f2eefc;
   font-size: 11px;
   font-weight: 600;
-  pointer-events: none;
+  pointer-events: all;
   user-select: none;
 }
 

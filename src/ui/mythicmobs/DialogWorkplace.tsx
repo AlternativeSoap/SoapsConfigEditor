@@ -84,7 +84,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const isInteractiveTarget = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return false
     return Boolean(
-      target.closest('.dw-bubble, .dw-dot, .dw-popout, .dw-option-chip, .dw-empty button'),
+      target.closest(
+        '.dw-bubble, .dw-dot, .dw-popout, .dw-option-chip, .dw-edge-group, .dw-empty button',
+      ),
     )
   }
 
@@ -586,15 +588,20 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
           <div ref={worldRef} className="dw-world">
             <svg className="dw-edges" aria-hidden>
               {edgePaths.map(({ edge, d, label, lx, ly }) => (
-                <g key={edge.id} className="dw-edge-group">
-                  <path
-                    d={d}
-                    className="dw-edge"
-                    onClick={(ev) => {
-                      ev.stopPropagation()
-                      deleteEdgeAt(edge.id)
-                    }}
-                  />
+                <g
+                  key={edge.id}
+                  className="dw-edge-group"
+                  onPointerDown={(ev) => {
+                    ev.stopPropagation()
+                    ev.preventDefault()
+                  }}
+                  onClick={(ev) => {
+                    ev.stopPropagation()
+                    deleteEdgeAt(edge.id)
+                  }}
+                >
+                  <path d={d} className="dw-edge-hit" />
+                  <path d={d} className="dw-edge" />
                   <rect
                     className="dw-edge-label-bg"
                     x={lx - Math.min(54, 6 + label.length * 3.2)}
@@ -606,6 +613,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                   <text className="dw-edge-label" x={lx} y={ly + 4} textAnchor="middle">
                     {label.length > 16 ? `${label.slice(0, 15)}…` : label}
                   </text>
+                  <title>Click to remove connection</title>
                 </g>
               ))}
               {connectDrag && connectFrom ? (
