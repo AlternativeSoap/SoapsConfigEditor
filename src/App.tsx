@@ -1494,18 +1494,20 @@ function App() {
             onChangeWorkspace={changeWorkspace}
           />
           {canExportFromBrowser ? (
-        <button
-          type="button"
-              className={needsSaveFolder ? 'primary' : ''}
+            <button
+              type="button"
+              className={needsSaveFolder ? 'primary' : undefined}
               onClick={() => void exportPackAsZip()}
               title="Download all files as a ZIP"
-        >
+            >
               Export ZIP
-        </button>
+            </button>
           ) : null}
           <button
             type="button"
-            className={needsSaveFolder || isDirty ? 'primary' : ''}
+            className={[needsSaveFolder || isDirty ? 'primary' : '', isDirty ? 'dirty' : '']
+              .filter(Boolean)
+              .join(' ') || undefined}
             onClick={saveActiveFile}
             disabled={!activeFile}
             title="Save (Ctrl+S)"
