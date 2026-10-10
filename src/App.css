@@ -4421,61 +4421,77 @@ button.tree-row.quest-entry {
 .dialog-workplace.dialog {
   width: min(1180px, 96vw);
   max-height: min(92vh, 900px);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .dw-body {
   display: grid;
-  grid-template-columns: 168px 1fr;
+  grid-template-columns: 176px 1fr;
   gap: 0;
   min-height: 520px;
   padding: 0 !important;
   overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: var(--surface-muted);
 }
 
 .dw-body:has(.dw-yaml) {
-  grid-template-columns: 168px 1fr 260px;
+  grid-template-columns: 176px 1fr 270px;
 }
 
 .dw-toolbox {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.75rem;
-  border-right: 1px solid var(--line);
-  background: var(--glass-surface, var(--surface));
+  gap: 0.35rem;
+  padding: 0.8rem 0.7rem;
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   overflow: auto;
 }
 
 .dw-tool {
   text-align: left;
-  font-size: 0.82rem;
-  padding: 0.45rem 0.55rem;
+  font-size: 0.8rem;
+  padding: 0.48rem 0.6rem;
   border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--surface-elevated, var(--surface)) 70%, transparent);
   color: var(--text);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.16s ease,
+    box-shadow 0.2s ease;
 }
 
 .dw-tool:hover:not(:disabled) {
-  border-color: var(--accent, #5b9f8a);
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 45%, transparent);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
 }
 
 .dw-tool.active {
-  border-color: var(--accent, #5b9f8a);
-  background: color-mix(in srgb, var(--accent, #5b9f8a) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 55%, transparent);
+  background: var(--surface-active);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #8b7cf8) 20%, transparent);
 }
 
 .dw-tool:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .dw-sep {
   border: none;
-  border-top: 1px solid var(--line);
-  margin: 0.35rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  margin: 0.4rem 0;
 }
 
 .dw-field {
@@ -4488,7 +4504,11 @@ button.tree-row.quest-entry {
 
 .dw-field select {
   font-size: 0.8rem;
-  padding: 0.3rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: var(--surface-inset);
+  color: var(--text);
 }
 
 .dw-hint,
@@ -4501,26 +4521,41 @@ button.tree-row.quest-entry {
 
 .dw-status {
   color: var(--text);
-  opacity: 0.85;
+  opacity: 0.88;
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  transition: opacity 0.2s ease;
 }
 
 .dw-canvas {
   position: relative;
   overflow: hidden;
+  outline: none;
   background:
-    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--line) 70%, transparent) 1px, transparent 0)
-    0 0 / 22px 22px;
+    radial-gradient(1200px 600px at 20% 0%, color-mix(in srgb, var(--accent, #8b7cf8) 10%, transparent), transparent 60%),
+    radial-gradient(900px 500px at 90% 80%, color-mix(in srgb, var(--accent, #8b7cf8) 7%, transparent), transparent 55%),
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 0)
+      0 0 / 24px 24px,
+    var(--surface-muted);
   cursor: grab;
   touch-action: none;
 }
 
-.dw-canvas:active {
+.dw-canvas.is-panning,
+.dw-canvas.is-panning:active {
+  cursor: grabbing;
+}
+
+.dw-canvas.is-dragging-bubble {
   cursor: grabbing;
 }
 
 .dw-world {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   transform-origin: 0 0;
   will-change: transform;
 }
@@ -4528,60 +4563,84 @@ button.tree-row.quest-entry {
 .dw-edges {
   position: absolute;
   inset: 0;
-  width: 4000px;
-  height: 3000px;
+  width: 8000px;
+  height: 6000px;
   overflow: visible;
   pointer-events: none;
 }
 
 .dw-edge {
   fill: none;
-  stroke: color-mix(in srgb, var(--text) 35%, transparent);
-  stroke-width: 2;
+  stroke: color-mix(in srgb, var(--text) 28%, transparent);
+  stroke-width: 2.25;
   pointer-events: stroke;
   cursor: pointer;
-  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
 }
 
 .dw-edge:hover {
-  stroke: var(--accent, #5b9f8a);
+  stroke: var(--accent, #8b7cf8);
   stroke-width: 3;
+  opacity: 1;
 }
 
 .dw-edge-preview {
-  stroke-dasharray: 6 4;
+  stroke: color-mix(in srgb, var(--accent, #8b7cf8) 75%, transparent);
+  stroke-dasharray: 7 5;
   pointer-events: none;
+  animation: dw-dash 0.8s linear infinite;
+}
+
+@keyframes dw-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
 }
 
 .dw-bubble {
   position: absolute;
-  width: 220px;
+  width: 228px;
   min-height: 96px;
-  padding: 0.55rem 0.65rem 0.45rem;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.6rem 0.7rem 0.5rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset,
+    0 10px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   cursor: grab;
   user-select: none;
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+  transition:
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    transform 0.18s ease,
+    background 0.22s ease;
   z-index: 1;
 }
 
 .dw-bubble:hover {
-  border-color: color-mix(in srgb, var(--accent, #5b9f8a) 50%, var(--line));
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 45%, var(--line));
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset,
+    0 14px 32px rgba(0, 0, 0, 0.22);
 }
 
 .dw-bubble.selected {
-  border-color: var(--accent, #5b9f8a);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #8b7cf8) 28%, transparent),
+    0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset,
+    0 16px 36px rgba(0, 0, 0, 0.24);
   z-index: 3;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .dw-bubble.entry {
-  outline: 1px dashed color-mix(in srgb, var(--accent, #5b9f8a) 55%, transparent);
-  outline-offset: 2px;
+  outline: 1px dashed color-mix(in srgb, var(--accent, #8b7cf8) 50%, transparent);
+  outline-offset: 3px;
 }
 
 .dw-bubble-head {
@@ -4600,9 +4659,10 @@ button.tree-row.quest-entry {
 
 .dw-badge {
   font-size: 0.65rem;
-  padding: 0.1rem 0.35rem;
+  padding: 0.12rem 0.4rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent, #5b9f8a) 18%, transparent);
+  background: color-mix(in srgb, var(--accent, #8b7cf8) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #8b7cf8) 35%, transparent);
   color: var(--text);
 }
 
@@ -4624,57 +4684,139 @@ button.tree-row.quest-entry {
   overflow: hidden;
 }
 
-.dw-ports {
-  list-style: none;
+.dw-dot {
+  position: absolute;
+  top: 52px;
+  width: 14px;
+  height: 14px;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent, #8b7cf8) 70%, #fff);
+  background: color-mix(in srgb, var(--panel) 90%, var(--accent, #8b7cf8));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--panel) 70%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  z-index: 6;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
-.dw-port {
-  width: 100%;
-  text-align: left;
-  font-size: 0.72rem;
-  padding: 0.22rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--surface-inset, var(--surface));
-  color: var(--text);
+.dw-dot-in {
+  left: -8px;
+}
+
+.dw-dot-out {
+  right: -8px;
+}
+
+.dw-dot:hover {
+  transform: scale(1.2);
+  background: var(--accent, #8b7cf8);
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 40%, #fff);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--accent, #8b7cf8) 22%, transparent),
+    0 4px 12px rgba(0, 0, 0, 0.28);
+}
+
+.dw-dot:focus-visible {
+  outline: 2px solid var(--accent, #8b7cf8);
+  outline-offset: 2px;
+}
+
+.dw-bubble.is-connect-source .dw-dot-out {
+  background: var(--accent, #8b7cf8);
+  animation: dw-dot-pulse 1s ease-in-out infinite;
+}
+
+.dw-bubble.is-connect-target {
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 55%, var(--line));
+}
+
+.dw-bubble.is-connect-target .dw-dot-in {
+  transform: scale(1.15);
+  background: var(--accent, #8b7cf8);
+}
+
+.dw-canvas.is-connecting {
   cursor: crosshair;
 }
 
-.dw-port:hover {
-  border-color: var(--accent, #5b9f8a);
+.dw-canvas.is-connecting .dw-bubble.is-connect-target {
+  cursor: pointer;
+}
+
+@keyframes dw-dot-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--panel) 70%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--accent, #8b7cf8) 0%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--panel) 70%, transparent),
+      0 0 0 8px color-mix(in srgb, var(--accent, #8b7cf8) 28%, transparent);
+  }
+}
+
+.dw-option-chips {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.dw-option-chips li {
+  font-size: 0.65rem;
+  line-height: 1.2;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  background: color-mix(in srgb, var(--surface-inset, var(--surface)) 80%, transparent);
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dw-popout {
   position: absolute;
   left: 0;
-  top: calc(100% + 10px);
-  width: 240px;
-  padding: 0.65rem;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+  top: calc(100% + 12px);
+  width: 248px;
+  padding: 0.7rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset,
+    0 14px 36px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
   cursor: default;
   z-index: 5;
-  animation: dw-pop 0.16s ease;
+  animation: dw-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes dw-pop {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-6px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -4684,9 +4826,9 @@ button.tree-row.quest-entry {
   left: 24px;
   width: 10px;
   height: 10px;
-  background: var(--surface);
-  border-left: 1px solid var(--line);
-  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   transform: rotate(45deg);
 }
 
@@ -4702,11 +4844,20 @@ button.tree-row.quest-entry {
 .dw-popout textarea,
 .dw-option-row input {
   font-size: 0.8rem;
-  padding: 0.3rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid var(--line);
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   background: var(--surface-inset, var(--surface));
   color: var(--text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dw-popout input:focus,
+.dw-popout textarea:focus,
+.dw-option-row input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #8b7cf8) 18%, transparent);
 }
 
 .dw-popout-row {
@@ -4739,12 +4890,18 @@ button.tree-row.quest-entry {
 
 .dw-mini {
   font-size: 0.72rem;
-  padding: 0.25rem 0.4rem;
-  border-radius: 6px;
-  border: 1px dashed var(--line);
+  padding: 0.28rem 0.45rem;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
   background: transparent;
   color: var(--text);
   cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.dw-mini:hover {
+  border-color: color-mix(in srgb, var(--accent, #8b7cf8) 45%, transparent);
+  background: var(--surface-hover);
 }
 
 .dw-empty {
@@ -4752,9 +4909,21 @@ button.tree-row.quest-entry {
   inset: 0;
   display: grid;
   place-content: center;
-  gap: 0.6rem;
+  gap: 0.7rem;
   text-align: center;
   pointer-events: none;
+  animation: dw-pop 0.28s ease;
+}
+
+.dw-empty p {
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-secondary);
 }
 
 .dw-empty button {
@@ -4763,10 +4932,12 @@ button.tree-row.quest-entry {
 }
 
 .dw-yaml {
-  border-left: 1px solid var(--line);
-  padding: 0.65rem;
+  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  padding: 0.75rem;
   overflow: auto;
-  background: var(--glass-surface, var(--surface));
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dw-yaml-title {
@@ -4780,8 +4951,12 @@ button.tree-row.quest-entry {
   line-height: 1.35;
   white-space: pre-wrap;
   word-break: break-word;
+  padding: 0.55rem;
+  border-radius: 10px;
+  background: var(--surface-inset);
+  border: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
 }
 
 .dw-footer {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }

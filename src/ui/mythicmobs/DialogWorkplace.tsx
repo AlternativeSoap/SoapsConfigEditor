@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { compileDialogGraph, createQuestOfferGraph } from '../../core/mythicmobs/dialogs/compile'
 import {
   createBubble,
@@ -22,7 +22,8 @@ interface DialogWorkplaceProps {
   onApply: (writes: { path: string; content: string; mode: 'create' | 'append' }[]) => void
 }
 
-type ToolMode = 'select' | 'connect'
+const BUBBLE_W = 228
+const BUBBLE_ANCHOR_Y = 52
 
 interface DragState {
   bubbleId: string
@@ -36,6 +37,8 @@ interface DragState {
 interface ConnectDrag {
   fromBubbleId: string
   optionKey: string
+  /** Created when the source bubble has no free option left */
+  newOption?: DialogOption
   x: number
   y: number
 }
@@ -51,18 +54,76 @@ function cloneGraph(g: DialogGraph): DialogGraph {
 export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWorkplaceProps) {
   const [graph, setGraph] = useState<DialogGraph>(() => createQuestOfferGraph())
   const [selectedId, setSelectedId] = useState<string | null>(() => graph.entryBubbleId)
-  const [tool, setTool] = useState<ToolMode>('select')
   const [showYaml, setShowYaml] = useState(false)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [connectDrag, setConnectDrag] = useState<ConnectDrag | null>(null)
   const [panning, setPanning] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
   const [past, setPast] = useState<HistoryEntry[]>([])
   const [future, setFuture] = useState<HistoryEntry[]>([])
   const [attachMobId, setAttachMobId] = useState('')
-  const [status, setStatus] = useState('Drag bubbles freely. Connect options to build branches.')
+  const [status, setStatus] = useState(
+    'Drag empty canvas to pan. Use the dots on a bubble to connect screens. Scroll to zoom.',
+  )
   const canvasRef = useRef<HTMLDivElement>(null)
+  const worldRef = useRef<HTMLDivElement>(null)
+  const panRef = useRef(pan)
+  const scaleRef = useRef(scale)
+  const panRafRef = useRef(0)
+  const connectRef = useRef<ConnectDrag | null>(null)
+
+  const isInteractiveTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false
+    return Boolean(target.closest('.dw-bubble, .dw-dot, .dw-popout, .dw-empty button'))
+  }
+
+  const setConnect = (next: ConnectDrag | null) => {
+    connectRef.current = next
+    setConnectDrag(next)
+  }
+
+  const applyWorldTransform = useCallback((x: number, y: number, s: number) => {
+    panRef.current = { x, y }
+    scaleRef.current = s
+    const el = worldRef.current
+    if (el) el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${s})`
+  }, [])
+
+  useEffect(() => {
+    if (panning) return
+    applyWorldTransform(pan.x, pan.y, scale)
+  }, [pan, scale, panning, applyWorldTransform])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && connectRef.current) {
+        e.preventDefault()
+        setConnect(null)
+        setStatus('Connection cancelled.')
+        return
+      }
+      if (e.code !== 'Space' || e.repeat) return
+      const t = e.target
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement) return
+      e.preventDefault()
+      setSpaceHeld(true)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault()
+        setSpaceHeld(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      if (panRafRef.current) cancelAnimationFrame(panRafRef.current)
+    }
+  }, [])
 
   const selected = graph.nodes.find((n) => n.id === selectedId) ?? null
   const compiled = useMemo(() => compileDialogGraph(graph), [graph])
@@ -118,7 +179,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     if (!next.entryBubbleId) next.entryBubbleId = bubble.id
     pushHistory(next)
     setSelectedId(bubble.id)
-    setStatus('Bubble added. Edit it in the popout, then connect options.')
+    setStatus('Bubble added. Edit it in the popout, then use the right-side dot to connect.')
   }
 
   const addOption = () => {
@@ -130,7 +191,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const key = newOptionKey('Option', keys)
     const opt: DialogOption = { key, label: `<green>${key}`, width: 150 }
     updateBubble(selected.id, { options: [...selected.options, opt] })
-    setStatus('Option added. Drag from its port to another bubble to connect.')
+    setStatus('Option added. Connect this bubble with the right-side dot when you are ready.')
   }
 
   const deleteSelected = () => {
@@ -149,17 +210,109 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const clientToCanvas = (clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
+    const { x: px, y: py } = panRef.current
+    const s = scaleRef.current
     return {
-      x: (clientX - rect.left - pan.x) / scale,
-      y: (clientY - rect.top - pan.y) / scale,
+      x: (clientX - rect.left - px) / s,
+      y: (clientY - rect.top - py) / s,
     }
   }
 
-  const onBubblePointerDown = (e: React.PointerEvent, bubble: DialogBubble) => {
-    if (tool === 'connect') return
+  const finishConnect = (toBubbleId: string) => {
+    const link = connectRef.current
+    if (!link || link.fromBubbleId === toBubbleId) {
+      setConnect(null)
+      return
+    }
+    const from = graph.nodes.find((n) => n.id === link.fromBubbleId)
+    const to = graph.nodes.find((n) => n.id === toBubbleId)
+    if (!from || !to) {
+      setConnect(null)
+      return
+    }
+
+    const nodes = graph.nodes.map((n) => {
+      if (n.id !== link.fromBubbleId) return n
+      const withOption = link.newOption ? [...n.options, link.newOption] : n.options
+      return {
+        ...n,
+        options: withOption.map((o) =>
+          o.key === link.optionKey ? { ...o, isEnd: false, skillId: undefined } : o,
+        ),
+      }
+    })
+
+    const exists = graph.edges.some(
+      (ed) => ed.fromBubbleId === link.fromBubbleId && ed.optionKey === link.optionKey,
+    )
+    const edges = exists
+      ? graph.edges.map((ed) =>
+          ed.fromBubbleId === link.fromBubbleId && ed.optionKey === link.optionKey
+            ? { ...ed, toBubbleId }
+            : ed,
+        )
+      : [
+          ...graph.edges,
+          {
+            id: crypto.randomUUID(),
+            fromBubbleId: link.fromBubbleId,
+            optionKey: link.optionKey,
+            toBubbleId,
+          },
+        ]
+
+    pushHistory({ ...graph, nodes, edges })
+    setConnect(null)
+    setStatus(`Connected ${from.dialogId} → ${to.dialogId}.`)
+  }
+
+  const beginConnectFrom = (bubble: DialogBubble, e: React.PointerEvent) => {
     e.stopPropagation()
+    e.preventDefault()
+    setDrag(null)
+    const linked = new Set(
+      graph.edges.filter((ed) => ed.fromBubbleId === bubble.id).map((ed) => ed.optionKey),
+    )
+    const free = bubble.options.find((o) => !linked.has(o.key))
+    const pt = clientToCanvas(e.clientX, e.clientY)
+    if (free) {
+      setConnect({
+        fromBubbleId: bubble.id,
+        optionKey: free.key,
+        x: pt.x,
+        y: pt.y,
+      })
+    } else {
+      const key = newOptionKey(`Option${bubble.options.length + 1}`, bubble.options.map((o) => o.key))
+      const newOption: DialogOption = { key, label: `<green>${key}`, width: 150 }
+      setConnect({
+        fromBubbleId: bubble.id,
+        optionKey: key,
+        newOption,
+        x: pt.x,
+        y: pt.y,
+      })
+    }
     setSelectedId(bubble.id)
-    ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+    setStatus('Click another bubble to finish the connection. Esc cancels.')
+  }
+
+  const onBubblePointerDown = (e: React.PointerEvent, bubble: DialogBubble) => {
+    if (spaceHeld || e.button === 1) return
+    e.stopPropagation()
+
+    if (connectRef.current || connectDrag) {
+      if (bubble.id === (connectRef.current ?? connectDrag)?.fromBubbleId) {
+        setConnect(null)
+        setStatus('Connection cancelled.')
+        return
+      }
+      finishConnect(bubble.id)
+      return
+    }
+
+    setSelectedId(bubble.id)
+    ;(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId)
     setDrag({
       bubbleId: bubble.id,
       ox: bubble.x,
@@ -172,15 +325,18 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
   const onCanvasPointerMove = (e: React.PointerEvent) => {
     if (panning) {
-      setPan({
-        x: panning.panX + (e.clientX - panning.x),
-        y: panning.panY + (e.clientY - panning.y),
+      const nextX = panning.panX + (e.clientX - panning.x)
+      const nextY = panning.panY + (e.clientY - panning.y)
+      if (panRafRef.current) cancelAnimationFrame(panRafRef.current)
+      panRafRef.current = requestAnimationFrame(() => {
+        applyWorldTransform(nextX, nextY, scaleRef.current)
       })
       return
     }
     if (drag) {
-      const dx = (e.clientX - drag.startX) / scale
-      const dy = (e.clientY - drag.startY) / scale
+      const s = scaleRef.current
+      const dx = (e.clientX - drag.startX) / s
+      const dy = (e.clientY - drag.startY) / s
       setGraph((g) => ({
         ...g,
         nodes: g.nodes.map((n) =>
@@ -189,15 +345,27 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
       }))
       return
     }
-    if (connectDrag) {
+    const link = connectRef.current
+    if (link) {
       const pt = clientToCanvas(e.clientX, e.clientY)
-      setConnectDrag({ ...connectDrag, x: pt.x, y: pt.y })
+      const next = { ...link, x: pt.x, y: pt.y }
+      connectRef.current = next
+      setConnectDrag(next)
     }
+  }
+
+  const endPan = () => {
+    if (panRafRef.current) {
+      cancelAnimationFrame(panRafRef.current)
+      panRafRef.current = 0
+    }
+    setPan({ ...panRef.current })
+    setPanning(null)
   }
 
   const onCanvasPointerUp = (e: React.PointerEvent) => {
     if (panning) {
-      setPanning(null)
+      endPan()
       return
     }
     if (drag) {
@@ -208,97 +376,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
         setFuture([])
       }
       setDrag(null)
-      return
     }
-    if (connectDrag) {
-      const pt = clientToCanvas(e.clientX, e.clientY)
-      const hit = graph.nodes.find(
-        (n) =>
-          n.id !== connectDrag.fromBubbleId &&
-          pt.x >= n.x &&
-          pt.x <= n.x + 220 &&
-          pt.y >= n.y &&
-          pt.y <= n.y + 120,
-      )
-      if (hit) {
-        const exists = graph.edges.some(
-          (ed) =>
-            ed.fromBubbleId === connectDrag.fromBubbleId &&
-            ed.optionKey === connectDrag.optionKey,
-        )
-        const edges = exists
-          ? graph.edges.map((ed) =>
-              ed.fromBubbleId === connectDrag.fromBubbleId &&
-              ed.optionKey === connectDrag.optionKey
-                ? { ...ed, toBubbleId: hit.id }
-                : ed,
-            )
-          : [
-              ...graph.edges,
-              {
-                id: crypto.randomUUID(),
-                fromBubbleId: connectDrag.fromBubbleId,
-                optionKey: connectDrag.optionKey,
-                toBubbleId: hit.id,
-              },
-            ]
-        const from = graph.nodes.find((n) => n.id === connectDrag.fromBubbleId)
-        const nodes = graph.nodes.map((n) => {
-          if (n.id !== connectDrag.fromBubbleId) return n
-          return {
-            ...n,
-            options: n.options.map((o) =>
-              o.key === connectDrag.optionKey ? { ...o, isEnd: false, skillId: undefined } : o,
-            ),
-          }
-        })
-        pushHistory({ ...graph, nodes, edges })
-        setStatus(`Connected ${from?.dialogId ?? 'bubble'} → ${hit.dialogId}.`)
-      } else {
-        // Drop on empty canvas: create bubble + connect
-        const dialogId = sanitizeDialogId(`Screen${graph.nodes.length + 1}`)
-        const bubble = createBubble(pt.x - 40, pt.y - 30, dialogId)
-        const edges = [
-          ...graph.edges.filter(
-            (ed) =>
-              !(
-                ed.fromBubbleId === connectDrag.fromBubbleId &&
-                ed.optionKey === connectDrag.optionKey
-              ),
-          ),
-          {
-            id: crypto.randomUUID(),
-            fromBubbleId: connectDrag.fromBubbleId,
-            optionKey: connectDrag.optionKey,
-            toBubbleId: bubble.id,
-          },
-        ]
-        const nodes = [
-          ...graph.nodes.map((n) => {
-            if (n.id !== connectDrag.fromBubbleId) return n
-            return {
-              ...n,
-              options: n.options.map((o) =>
-                o.key === connectDrag.optionKey ? { ...o, isEnd: false } : o,
-              ),
-            }
-          }),
-          bubble,
-        ]
-        pushHistory({ ...graph, nodes, edges })
-        setSelectedId(bubble.id)
-        setStatus('Created and connected a new bubble.')
-      }
-      setConnectDrag(null)
-      setTool('select')
-    }
-  }
-
-  const startConnect = (bubbleId: string, optionKey: string, e: React.PointerEvent) => {
-    e.stopPropagation()
-    const pt = clientToCanvas(e.clientX, e.clientY)
-    setTool('connect')
-    setConnectDrag({ fromBubbleId: bubbleId, optionKey, x: pt.x, y: pt.y })
   }
 
   const deleteEdgeAt = (edgeId: string) => {
@@ -347,34 +425,34 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const from = graph.nodes.find((n) => n.id === edge.fromBubbleId)
     const to = graph.nodes.find((n) => n.id === edge.toBubbleId)
     if (!from || !to) return null
-    const optIndex = Math.max(0, from.options.findIndex((o) => o.key === edge.optionKey))
-    const x1 = from.x + 220
-    const y1 = from.y + 56 + optIndex * 22
+    const fromOuts = graph.edges.filter((ed) => ed.fromBubbleId === from.id)
+    const outIndex = Math.max(0, fromOuts.findIndex((ed) => ed.id === edge.id))
+    const outCount = Math.max(1, fromOuts.length)
+    const ySpread = (outIndex - (outCount - 1) / 2) * 14
+    const x1 = from.x + BUBBLE_W
+    const y1 = from.y + BUBBLE_ANCHOR_Y + ySpread
     const x2 = to.x
-    const y2 = to.y + 40
+    const y2 = to.y + BUBBLE_ANCHOR_Y
     const mx = (x1 + x2) / 2
     return { edge, d: `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}` }
   }).filter(Boolean) as { edge: (typeof graph.edges)[0]; d: string }[]
+
+  const connectFrom = connectDrag
+    ? graph.nodes.find((n) => n.id === connectDrag.fromBubbleId)
+    : null
 
   return (
     <DialogShell size="xl" className="dialog-workplace" labelledBy="dialog-workplace-title" onClose={onClose}>
       <DialogHeader
         title="Dialog workplace"
         titleId="dialog-workplace-title"
-        lead="Build branching Paper dialogs. Drag freely, connect options, then save into Dialogs/."
+        lead="Build branching Paper dialogs. Drag freely, connect with the side dots, then save into Dialogs/."
         onClose={onClose}
       />
       <DialogBody className="dw-body">
         <aside className="dw-toolbox" aria-label="Dialog tools">
           <button type="button" className="dw-tool" onClick={addBubble}>Add bubble</button>
           <button type="button" className="dw-tool" onClick={addOption} disabled={!selected}>Add option</button>
-          <button
-            type="button"
-            className={`dw-tool ${tool === 'connect' ? 'active' : ''}`}
-            onClick={() => setTool((t) => (t === 'connect' ? 'select' : 'connect'))}
-          >
-            {tool === 'connect' ? 'Connecting…' : 'Connect mode'}
-          </button>
           <button type="button" className="dw-tool" onClick={deleteSelected} disabled={!selected}>Delete bubble</button>
           <button type="button" className="dw-tool" onClick={undo} disabled={past.length === 0}>Undo</button>
           <button type="button" className="dw-tool" onClick={redo} disabled={future.length === 0}>Redo</button>
@@ -400,26 +478,74 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
 
         <div
           ref={canvasRef}
-          className="dw-canvas"
+          className={[
+            'dw-canvas',
+            panning || spaceHeld ? 'is-panning' : '',
+            drag ? 'is-dragging-bubble' : '',
+            connectDrag ? 'is-connecting' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          tabIndex={0}
           onPointerMove={onCanvasPointerMove}
           onPointerUp={onCanvasPointerUp}
-          onPointerLeave={() => { setDrag(null); setPanning(null) }}
+          onPointerCancel={() => {
+            setDrag(null)
+            endPan()
+            setConnect(null)
+          }}
           onPointerDown={(e) => {
-            if (e.button === 1 || e.altKey || (e.button === 0 && e.target === canvasRef.current)) {
-              setPanning({ x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y })
+            if (
+              connectDrag &&
+              e.button === 0 &&
+              !e.altKey &&
+              !spaceHeld &&
+              !isInteractiveTarget(e.target)
+            ) {
+              e.preventDefault()
+              setConnect(null)
+              setStatus('Connection cancelled.')
               setSelectedId(null)
+              return
             }
+            const wantPan =
+              e.button === 1 ||
+              e.altKey ||
+              spaceHeld ||
+              (e.button === 0 && !isInteractiveTarget(e.target) && !connectDrag)
+            if (!wantPan) return
+            e.preventDefault()
+            canvasRef.current?.setPointerCapture?.(e.pointerId)
+            setPanning({
+              x: e.clientX,
+              y: e.clientY,
+              panX: panRef.current.x,
+              panY: panRef.current.y,
+            })
+            if (!spaceHeld) setSelectedId(null)
           }}
           onWheel={(e) => {
             e.preventDefault()
-            const factor = e.deltaY > 0 ? 0.92 : 1.08
-            setScale((s) => Math.min(1.8, Math.max(0.45, s * factor)))
+            const rect = canvasRef.current?.getBoundingClientRect()
+            if (!rect) return
+            const factor = e.deltaY > 0 ? 0.9 : 1.1
+            const prev = scaleRef.current
+            const next = Math.min(2, Math.max(0.35, prev * factor))
+            if (next === prev) return
+            const cx = e.clientX - rect.left
+            const cy = e.clientY - rect.top
+            const ratio = next / prev
+            const p = panRef.current
+            const nextPan = {
+              x: cx - (cx - p.x) * ratio,
+              y: cy - (cy - p.y) * ratio,
+            }
+            applyWorldTransform(nextPan.x, nextPan.y, next)
+            setPan(nextPan)
+            setScale(next)
           }}
         >
-          <div
-            className="dw-world"
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
-          >
+          <div ref={worldRef} className="dw-world">
             <svg className="dw-edges" aria-hidden>
               {edgePaths.map(({ edge, d }) => (
                 <g key={edge.id}>
@@ -433,14 +559,10 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                   />
                 </g>
               ))}
-              {connectDrag ? (
+              {connectDrag && connectFrom ? (
                 <path
                   className="dw-edge dw-edge-preview"
-                  d={`M ${
-                    (graph.nodes.find((n) => n.id === connectDrag.fromBubbleId)?.x ?? 0) + 220
-                  } ${
-                    (graph.nodes.find((n) => n.id === connectDrag.fromBubbleId)?.y ?? 0) + 56
-                  } L ${connectDrag.x} ${connectDrag.y}`}
+                  d={`M ${connectFrom.x + BUBBLE_W} ${connectFrom.y + BUBBLE_ANCHOR_Y} L ${connectDrag.x} ${connectDrag.y}`}
                 />
               ) : null}
             </svg>
@@ -448,13 +570,50 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
             {graph.nodes.map((bubble) => {
               const isSel = bubble.id === selectedId
               const isEntry = bubble.id === graph.entryBubbleId
+              const isSource = connectDrag?.fromBubbleId === bubble.id
               return (
                 <div
                   key={bubble.id}
-                  className={`dw-bubble ${isSel ? 'selected' : ''} ${isEntry ? 'entry' : ''}`}
+                  className={[
+                    'dw-bubble',
+                    isSel ? 'selected' : '',
+                    isEntry ? 'entry' : '',
+                    isSource ? 'is-connect-source' : '',
+                    connectDrag && !isSource ? 'is-connect-target' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   style={{ left: bubble.x, top: bubble.y }}
                   onPointerDown={(e) => onBubblePointerDown(e, bubble)}
                 >
+                  <button
+                    type="button"
+                    className="dw-dot dw-dot-in"
+                    aria-label={`Connect into ${bubble.dialogId}`}
+                    title="Drop connection here"
+                    onPointerDown={(e) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      if (connectDrag && connectDrag.fromBubbleId !== bubble.id) {
+                        finishConnect(bubble.id)
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="dw-dot dw-dot-out"
+                    aria-label={`Connect from ${bubble.dialogId}`}
+                    title="Start a connection"
+                    onPointerDown={(e) => {
+                      if (connectDrag && connectDrag.fromBubbleId !== bubble.id) {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        finishConnect(bubble.id)
+                        return
+                      }
+                      beginConnectFrom(bubble, e)
+                    }}
+                  />
                   <div className="dw-bubble-head">
                     <span className="dw-bubble-id">{bubble.dialogId}</span>
                     {isEntry ? <span className="dw-badge">Entry</span> : null}
@@ -465,20 +624,13 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                       ? bubble.body[0].message.replace(/<[^>]+>/g, '')
                       : 'Item body'}
                   </p>
-                  <ul className="dw-ports">
-                    {bubble.options.map((opt) => (
-                      <li key={opt.key}>
-                        <button
-                          type="button"
-                          className="dw-port"
-                          title="Drag to connect"
-                          onPointerDown={(e) => startConnect(bubble.id, opt.key, e)}
-                        >
-                          {opt.label.replace(/<[^>]+>/g, '') || opt.key}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  {bubble.options.length > 0 ? (
+                    <ul className="dw-option-chips" aria-label="Options">
+                      {bubble.options.map((opt) => (
+                        <li key={opt.key}>{opt.label.replace(/<[^>]+>/g, '') || opt.key}</li>
+                      ))}
+                    </ul>
+                  ) : null}
 
                   {isSel ? (
                     <div
