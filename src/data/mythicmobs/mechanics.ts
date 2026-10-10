@@ -529,6 +529,11 @@ export const MECHANICS: MechanicEntry[] = [
   { id: 'setrotation', aliases: [], category: 'utility', description: 'Sets the rotation of the target entity', insertSnippet: 'setrotation{yaw=0;pitch=0}' },
   { id: 'matchrotation', aliases: [], category: 'utility', description: 'Sets the target\'s yaw and pitch to match another entity', insertSnippet: 'matchrotation{target=@Parent}' },
   { id: 'modifyprojectile', aliases: [], category: 'projectile', description: 'Modifies the calling projectile\'s properties', insertSnippet: 'modifyprojectile{velocity=1.5}' },
+  { id: 'showdialog', aliases: ['opendialog', 'dialog'], category: 'utility', description: 'Shows a Paper dialog UI to the target player (Premium, Paper 1.21.6+)', insertSnippet: 'showdialog{dialog=WelcomeNotice}', attributes: [
+    { name: 'dialog', type: 'string', default: 'default', desc: 'Dialog id from Dialogs/' },
+    { name: 'd', type: 'string', desc: 'Alias of dialog' },
+    { name: 'name', type: 'string', desc: 'Alias of dialog' },
+  ]},
   { id: 'closedialog', aliases: [], category: 'utility', description: 'Closes an open dialog for the target player', insertSnippet: 'closedialog{}' },
   { id: 'opentrades', aliases: [], category: 'utility', description: 'Opens the villager trade GUI for the target player', insertSnippet: 'opentrades{}' },
   { id: 'summonpassenger', aliases: [], category: 'utility', description: 'Summons a mob as a passenger on the caster', insertSnippet: 'summonpassenger{type=MyMob}' },

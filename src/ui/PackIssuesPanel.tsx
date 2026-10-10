@@ -12,6 +12,7 @@ interface PackIssuesPanelProps {
 
 const TYPE_LABEL: Record<ValidationIssue['type'], string> = {
   missing_skill_reference: 'Missing skill',
+  missing_dialog_reference: 'Missing dialog',
   missing_droptable_reference: 'Unresolved drop',
   missing_spawn_mob_reference: 'Missing mob',
   missing_equipment_set_reference: 'Missing equipment set',

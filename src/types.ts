@@ -30,6 +30,7 @@ export type MythicCategory =
   | 'skills'
   | 'droptables'
   | 'randomspawns'
+  | 'dialogs'
   | 'menus'
   | 'classes'
   | 'exp-curves'
@@ -81,6 +82,7 @@ export interface FileIndex {
 
 export type ValidationIssueType =
   | 'missing_skill_reference'
+  | 'missing_dialog_reference'
   | 'missing_droptable_reference'
   | 'missing_spawn_mob_reference'
   | 'missing_equipment_set_reference'
@@ -100,6 +102,7 @@ export interface PackIndex {
   itemIds: string[]
   skillIds: string[]
   droptableIds: string[]
+  dialogIds: string[]
   reagentIds: string[]
   archetypeIds: string[]
   equipmentSetIds: string[]
@@ -114,6 +117,8 @@ export type CreateKind =
   | 'skill'
   | 'droptable'
   | 'randomspawn'
+  | 'dialog'
+  | 'dialog-workplace'
   | 'class'
   | 'mmocore-skill'
   | 'elements'

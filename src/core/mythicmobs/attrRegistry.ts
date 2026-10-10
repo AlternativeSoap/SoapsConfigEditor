@@ -10,6 +10,9 @@ export const SKILL_REF_ATTRS = new Set([
 export const DROPTABLE_ATTRS = new Set(['table'])
 export const ITEM_ATTRS = new Set(['material', 'item', 'i', 'blocktype', 'block'])
 export const SLOT_ATTRS = new Set(['slot'])
+/** Dialog id attrs on showdialog / opendialog / dialog mechanics. */
+export const DIALOG_REF_ATTRS = new Set(['dialog', 'd', 'name'])
+export const DIALOG_MECHANIC_IDS = new Set(['showdialog', 'opendialog', 'dialog'])
 
 export function inferAttrTypeFromName(name: string, defaultVal?: string): import('../../data/mythicmobs/mechanics').MechanicAttr['type'] {
   const n = name.toLowerCase()

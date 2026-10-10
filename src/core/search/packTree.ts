@@ -6,6 +6,7 @@ export const CATEGORY_LABEL: Record<MythicCategory, string> = {
   skills: 'Skills',
   droptables: 'Drop tables',
   randomspawns: 'Random spawns',
+  dialogs: 'Dialogs',
   menus: 'Menus',
   classes: 'Classes',
   'exp-curves': 'Exp curves',

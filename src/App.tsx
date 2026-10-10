@@ -77,6 +77,7 @@ import type {
 import { DEFAULT_SAVE_PREFS } from './types'
 import { DEFAULT_AC_PREFS } from './core/mythicmobs/autocomplete'
 import { CreateDialog } from './ui/CreateDialog'
+import { DialogWorkplace } from './ui/mythicmobs/DialogWorkplace'
 import { DependencyPanel, countFileDependencies } from './ui/DependencyPanel'
 import { PackIssuesPanel, countPackSidebarItems } from './ui/PackIssuesPanel'
 import { NewMenu } from './ui/NewMenu'
@@ -404,6 +405,7 @@ function App() {
     itemIds: effectiveFiles.filter((f) => f.category === 'items').flatMap((f) => f.ids),
     skillIds: effectiveFiles.filter((f) => f.category === 'skills').flatMap((f) => f.ids),
     droptableIds: effectiveFiles.filter((f) => f.category === 'droptables').flatMap((f) => f.ids),
+    dialogIds: effectiveFiles.filter((f) => f.category === 'dialogs').flatMap((f) => f.ids),
     reagentIds: effectiveFiles.filter((f) => f.category === 'reagents').flatMap((f) => f.ids),
     archetypeIds: effectiveFiles.filter((f) => f.category === 'archetypes').flatMap((f) => f.ids),
     equipmentSetIds: effectiveFiles.filter((f) => f.category === 'equipment-sets').flatMap((f) => f.ids),
@@ -1975,7 +1977,9 @@ function App() {
       createKind !== 'bag' &&
       createKind !== 'crucible-stat' &&
       createKind !== 'lore-template' &&
-      createKind !== 'placeholder' ? (
+      createKind !== 'placeholder' &&
+      createKind !== 'dialog' &&
+      createKind !== 'dialog-workplace' ? (
         <CreateDialog
           kind={createKind}
           files={files}
@@ -1984,6 +1988,17 @@ function App() {
           crucibleEnabled={crucibleEnabled}
           onClose={() => setCreateKind(null)}
           onInsert={insertGenerated}
+        />
+      ) : null}
+      {(createKind === 'dialog-workplace' || createKind === 'dialog') && isMythicMobs ? (
+        <DialogWorkplace
+          files={effectiveFiles}
+          packIndex={packIndex}
+          onClose={() => setCreateKind(null)}
+          onApply={(writes) => {
+            void applyMultiFileWrite(writes)
+            setCreateKind(null)
+          }}
         />
       ) : null}
       {createKind === 'spell' && mythicRpgEnabled ? (

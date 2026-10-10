@@ -15,6 +15,7 @@ const MYTHIC_ITEMS: { kind: CreateKind; label: string }[] = [
   { kind: 'skill', label: 'New skill' },
   { kind: 'droptable', label: 'New drop table' },
   { kind: 'randomspawn', label: 'New random spawn' },
+  { kind: 'dialog-workplace', label: 'Dialog workplace' },
 ]
 
 const MYTHIC_RPG_ITEMS: { kind: CreateKind; label: string }[] = [

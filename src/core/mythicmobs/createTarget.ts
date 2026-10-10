@@ -3,7 +3,7 @@ import { classifyMythicCategory } from './classify'
 
 /** Canonical MythicMobs folder names under a pack root. */
 export const CATEGORY_FOLDER_NAME: Record<
-  'mobs' | 'items' | 'skills' | 'droptables' | 'randomspawns',
+  'mobs' | 'items' | 'skills' | 'droptables' | 'randomspawns' | 'dialogs',
   string
 > = {
   mobs: 'Mobs',
@@ -11,6 +11,7 @@ export const CATEGORY_FOLDER_NAME: Record<
   skills: 'Skills',
   droptables: 'DropTables',
   randomspawns: 'RandomSpawns',
+  dialogs: 'Dialogs',
 }
 
 export function dirnameOf(path: string): string {

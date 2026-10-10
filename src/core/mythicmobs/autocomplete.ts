@@ -542,6 +542,7 @@ function braceAttrCompletion(
   packMobIds: string[],
   packItemIds: string[],
   packDroptableIds: string[],
+  packDialogIds: string[] = [],
 ): CompletionResult | null {
   const line = context.state.doc.lineAt(context.pos)
   const before = line.text.slice(0, context.pos - line.from)
@@ -562,6 +563,7 @@ function braceAttrCompletion(
       packMobIds,
       packItemIds,
       packDroptableIds,
+      packDialogIds,
     )
     if (valueResult) return valueResult
     return buildBraceAttrCompletions(inside, merged, context)
@@ -610,6 +612,7 @@ function packIdCompletions(
   packMobIds: string[],
   _packItemIds: string[],
   packDroptableIds: string[],
+  packDialogIds: string[] = [],
 ): CompletionResult | null {
   const skillAttrMatch = /(?:^|;)s(?:kills)?=([A-Za-z0-9_,]*)$/.exec(before)
   if (skillAttrMatch) {
@@ -628,6 +631,19 @@ function packIdCompletions(
     return completionResult(
       context.pos - typed.length,
       filterByPrefix(packCompletions(packSkillIds, 'skill'), typed),
+      /^[A-Za-z0-9_]*$/,
+    )
+  }
+
+  const dialogMatch =
+    /(?:showdialog|opendialog|(?<![A-Za-z])dialog)\{[^}]*(?:dialog|d|name)=([A-Za-z0-9_]*)$/i.exec(
+      before,
+    )
+  if (dialogMatch) {
+    const typed = dialogMatch[1] ?? ''
+    return completionResult(
+      context.pos - typed.length,
+      filterByPrefix(packCompletions(packDialogIds, 'dialog'), typed),
       /^[A-Za-z0-9_]*$/,
     )
   }
@@ -1143,6 +1159,7 @@ export function mythicCompletion(
   packEquipmentSetIds: string[] = [],
   packAugmentTypeIds: string[] = [],
   filePath?: string,
+  packDialogIds: string[] = [],
 ) {
   const completions = buildCatalogCompletions(catalogs)
 
@@ -1164,6 +1181,7 @@ export function mythicCompletion(
       packMobIds,
       packItemIds,
       packDroptableIds,
+      packDialogIds,
     )
     if (braceResult) return braceResult
 
@@ -1175,6 +1193,7 @@ export function mythicCompletion(
         packMobIds,
         packItemIds,
         packDroptableIds,
+        packDialogIds,
       )
       if (packResult) return packResult
     }
@@ -1410,6 +1429,7 @@ export function buildMythicAutocomplete(
   packEquipmentSetIds: string[] = [],
   packAugmentTypeIds: string[] = [],
   filePath?: string,
+  packDialogIds: string[] = [],
 ) {
   const catalogs = resolveMythicCatalogs(crucible)
   return [
@@ -1427,6 +1447,7 @@ export function buildMythicAutocomplete(
           packEquipmentSetIds,
           packAugmentTypeIds,
           filePath,
+          packDialogIds,
         ),
       ],
       defaultKeymap: true,

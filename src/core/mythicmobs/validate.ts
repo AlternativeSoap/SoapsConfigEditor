@@ -292,9 +292,52 @@ export function validateCrucibleItemReferences(files: FileRecord[]): ValidationI
   return issues
 }
 
+/** Extract dialog ids referenced by showdialog{dialog=…} / aliases in skill lines. */
+export function extractDialogRefsFromContent(content: string): string[] {
+  const refs: string[] = []
+  const re =
+    /(?:showdialog|opendialog|(?<![A-Za-z0-9_])dialog)\s*\{[^}]*(?:dialog|d|name)\s*=\s*([A-Za-z0-9_\-]+)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content))) {
+    if (m[1]) refs.push(m[1])
+  }
+  return refs
+}
+
+export function validateDialogReferences(files: FileRecord[]): ValidationIssue[] {
+  const dialogIds = new Set<string>()
+  for (const file of files) {
+    if (file.category !== 'dialogs') continue
+    for (const id of file.ids) dialogIds.add(id)
+  }
+  if (dialogIds.size === 0 && !files.some((f) => /showdialog|opendialog/i.test(f.content))) {
+    return []
+  }
+
+  const issues: ValidationIssue[] = []
+  const seen = new Set<string>()
+  for (const file of files) {
+    if (file.category !== 'skills' && file.category !== 'mobs') continue
+    for (const ref of extractDialogRefsFromContent(file.content)) {
+      if (dialogIds.has(ref)) continue
+      const key = `${file.path}:${ref}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      issues.push({
+        type: 'missing_dialog_reference',
+        filePath: file.path,
+        entityId: file.ids[0] ?? file.name,
+        missingId: ref,
+      })
+    }
+  }
+  return issues
+}
+
 export function validatePack(files: FileRecord[]): ValidationIssue[] {
   return [
     ...validateMobSkillReferences(files),
+    ...validateDialogReferences(files),
     ...validateDroptableReferences(files),
     ...validateRandomSpawnMobReferences(files),
     ...validateCrucibleItemReferences(files),

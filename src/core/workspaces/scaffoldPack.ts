@@ -80,6 +80,12 @@ export function scaffoldPack(kind: WorkspaceKind, options: ScaffoldOptions): Fil
         'droptables',
       ),
       file(
+        `${base}/Dialogs/dialogs.yml`,
+        `# Paper dialogs for ${packName} (Mythic Premium, Paper 1.21.6+).\n# Filenames must contain "dialog". Use New → Dialog workplace to build branching screens.\n`,
+        packName,
+        'dialogs',
+      ),
+      file(
         `${base}/randomspawns/randomspawns.yml`,
         `# Random spawns for ${packName}\n`,
         packName,

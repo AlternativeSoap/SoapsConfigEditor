@@ -92,6 +92,7 @@ describe('scaffoldPack includeExamples', () => {
       includeExamples: false,
     })
     expect(paths(files)).toEqual([
+      'MythicMobs/Packs/Demo/Dialogs/dialogs.yml',
       'MythicMobs/Packs/Demo/DropTables/droptables.yml',
       'MythicMobs/Packs/Demo/Items/items.yml',
       'MythicMobs/Packs/Demo/Mobs/mobs.yml',

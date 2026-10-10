@@ -179,6 +179,7 @@ export const YamlEditor = forwardRef<YamlEditorHandle, YamlEditorProps>(
           packIndex.equipmentSetIds,
           packIndex.augmentTypeIds,
           filePathRef.current,
+          packIndex.dialogIds,
         )
       }
       if (fileCategoryRef.current) {

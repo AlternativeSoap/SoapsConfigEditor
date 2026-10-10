@@ -33,7 +33,14 @@ import {
   VISIBILITY_MECHANIC_IDS,
 } from '../../data/mythicmobs/sharedSkillAttrs'
 import { MINECRAFT_SOUND_KEYS } from '../../data/mythicmobs/soundKeys'
-import { DROPTABLE_ATTRS, ITEM_ATTRS, SKILL_REF_ATTRS, SLOT_ATTRS } from './attrRegistry'
+import {
+  DIALOG_MECHANIC_IDS,
+  DIALOG_REF_ATTRS,
+  DROPTABLE_ATTRS,
+  ITEM_ATTRS,
+  SKILL_REF_ATTRS,
+  SLOT_ATTRS,
+} from './attrRegistry'
 import { parseAttrNames } from './skillLineAttrs'
 
 export { PARTICLE_TYPES } from '../../data/mythicmobs/particleTypes'
@@ -312,6 +319,7 @@ export function valuesForAttr(
   packItemIds: string[] = [],
   packDroptableIds: string[] = [],
   braceInside = '',
+  packDialogIds: string[] = [],
 ): string[] {
   const type = effectiveAttrType(attr)
   const name = attr.name.toLowerCase()
@@ -319,6 +327,7 @@ export function valuesForAttr(
 
   if (SKILL_REF_ATTRS.has(name) || type === 'skill') return packSkillIds
   if (DROPTABLE_ATTRS.has(name)) return packDroptableIds
+  if (DIALOG_MECHANIC_IDS.has(block) && DIALOG_REF_ATTRS.has(name)) return packDialogIds
   if (SLOT_ATTRS.has(name)) return [...EQUIPMENT_SLOTS]
   if (ITEM_ATTRS.has(name)) return [...new Set([...MATERIALS, ...packItemIds])]
 
@@ -398,6 +407,7 @@ export function optionsForAttr(
   packDroptableIds: string[] = [],
   braceInside = '',
   typed = '',
+  packDialogIds: string[] = [],
 ): AttrValueOption[] {
   const name = attr.name.toLowerCase()
 
@@ -432,6 +442,7 @@ export function optionsForAttr(
     packItemIds,
     packDroptableIds,
     braceInside,
+    packDialogIds,
   )
   return values.filter((v) => matchesTyped(v, typed)).map((label) => ({
     label,
@@ -448,6 +459,7 @@ export function buildBraceAttrValueCompletions(
   packMobIds: string[],
   packItemIds: string[] = [],
   packDroptableIds: string[] = [],
+  packDialogIds: string[] = [],
 ): CompletionResult | null {
   const valueMatch = /(?:^|;)\s*([A-Za-z0-9_]+)=([^;]*)$/.exec(inside)
   if (!valueMatch) return null
@@ -471,6 +483,7 @@ export function buildBraceAttrValueCompletions(
     packDroptableIds,
     inside,
     typed,
+    packDialogIds,
   )
   if (options.length === 0) return null
 

@@ -6,6 +6,7 @@ const CATEGORY_FOLDERS: Record<string, MythicCategory> = {
   skills: 'skills',
   droptables: 'droptables',
   randomspawns: 'randomspawns',
+  dialogs: 'dialogs',
   menus: 'menus',
   archetypes: 'archetypes',
   reagents: 'reagents',
@@ -14,6 +15,10 @@ const CATEGORY_FOLDERS: Record<string, MythicCategory> = {
 export function classifyMythicCategory(filePath: string): MythicCategory {
   const normalized = filePath.replace(/\\/g, '/')
   const baseName = normalized.split('/').pop()?.toLowerCase() ?? ''
+  // Wiki: dialog filenames must contain "dialog" (e.g. ExampleDialogs.yml, quest-dialog.yml).
+  if (/\.ya?ml$/i.test(baseName) && baseName.includes('dialog')) {
+    return 'dialogs'
+  }
   if (baseName === 'mobs.yml' || baseName.startsWith('mobs.')) {
     return 'mobs'
   }
