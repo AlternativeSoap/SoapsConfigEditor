@@ -4565,7 +4565,9 @@ button.tree-row.quest-entry {
   width: 100%;
   height: 100%;
   transform-origin: 0 0;
-  will-change: transform;
+  /* Avoid will-change/filters here: they rasterize children and blur when zoomed. */
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
 }
 
 .dw-edges {
@@ -4633,26 +4635,23 @@ button.tree-row.quest-entry {
   min-height: 96px;
   padding: 0.6rem 0.7rem 0.5rem;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  /* Opaque fill (no backdrop-filter): blur filters + zoom make text mushy. */
+  background: color-mix(in srgb, var(--panel) 97%, #121218);
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   box-shadow:
     0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset,
     0 10px 28px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   cursor: grab;
   user-select: none;
   transition:
     box-shadow 0.22s ease,
     border-color 0.22s ease,
-    transform 0.18s ease,
     background 0.22s ease;
   z-index: 1;
 }
 
 .dw-bubble:hover {
   border-color: color-mix(in srgb, var(--accent, #8b7cf8) 45%, var(--line));
-  transform: translateY(-2px);
   box-shadow:
     0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset,
     0 14px 32px rgba(0, 0, 0, 0.22);
@@ -4665,7 +4664,6 @@ button.tree-row.quest-entry {
     0 1px 0 color-mix(in srgb, #fff 8%, transparent) inset,
     0 16px 36px rgba(0, 0, 0, 0.24);
   z-index: 3;
-  transform: translateY(-2px);
 }
 
 .dw-bubble.entry {
@@ -4849,13 +4847,11 @@ button.tree-row.quest-entry {
   max-height: min(52vh, 460px);
   padding: 0.7rem 0.75rem;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  background: color-mix(in srgb, var(--panel) 97%, #121218);
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
   box-shadow:
     0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset,
     0 14px 36px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;

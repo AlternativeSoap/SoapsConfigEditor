@@ -135,7 +135,17 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     panRef.current = { x, y }
     scaleRef.current = s
     const el = worldRef.current
-    if (el) el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${s})`
+    if (!el) return
+    el.style.transformOrigin = '0 0'
+    // CSS zoom keeps HTML text sharp; transform scale rasterizes and blurs when zoomed.
+    const useZoom = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('zoom', '1')
+    if (useZoom) {
+      el.style.transform = `translate3d(${x / s}px, ${y / s}px, 0)`
+      el.style.setProperty('zoom', String(s))
+    } else {
+      el.style.removeProperty('zoom')
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${s})`
+    }
   }, [])
 
   useEffect(() => {
