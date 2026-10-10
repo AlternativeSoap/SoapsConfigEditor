@@ -4707,6 +4707,7 @@ button.tree-row.quest-entry {
 }
 
 .dw-dot {
+  /* Geometry mirrored by DOT_* constants in DialogWorkplace.tsx */
   position: absolute;
   top: 52px;
   width: 14px;

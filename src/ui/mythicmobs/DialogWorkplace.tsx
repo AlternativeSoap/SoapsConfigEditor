@@ -28,7 +28,13 @@ interface DialogWorkplaceProps {
 }
 
 const BUBBLE_W = 228
-const BUBBLE_ANCHOR_Y = 52
+/** Must match .dw-dot size/offset in App.css */
+const DOT_SIZE = 14
+const DOT_TOP = 52
+const DOT_OUTSET = 8
+const DOT_CENTER_Y = DOT_TOP + DOT_SIZE / 2
+const DOT_OUT_X = BUBBLE_W + DOT_OUTSET - DOT_SIZE / 2
+const DOT_IN_X = -DOT_OUTSET + DOT_SIZE / 2
 
 interface DragState {
   bubbleId: string
@@ -454,20 +460,25 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const fromOuts = graph.edges.filter((ed) => ed.fromBubbleId === from.id)
     const outIndex = Math.max(0, fromOuts.findIndex((ed) => ed.id === edge.id))
     const outCount = Math.max(1, fromOuts.length)
-    const ySpread = (outIndex - (outCount - 1) / 2) * 14
-    const x1 = from.x + BUBBLE_W
-    const y1 = from.y + BUBBLE_ANCHOR_Y + ySpread
-    const x2 = to.x
-    const y2 = to.y + BUBBLE_ANCHOR_Y
-    const mx = (x1 + x2) / 2
+    // Keep endpoints on the dots; spread only the curve so multiple links stay readable.
+    const bend = (outIndex - (outCount - 1) / 2) * 36
+    const x1 = from.x + DOT_OUT_X
+    const y1 = from.y + DOT_CENTER_Y
+    const x2 = to.x + DOT_IN_X
+    const y2 = to.y + DOT_CENTER_Y
+    const span = Math.max(48, Math.abs(x2 - x1) * 0.45)
+    const c1x = x1 + span
+    const c1y = y1 + bend
+    const c2x = x2 - span
+    const c2y = y2 + bend
     const opt = from.options.find((o) => o.key === edge.optionKey)
     const label = stripMm(opt?.label ?? edge.optionKey) || edge.optionKey
     return {
       edge,
-      d: `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`,
+      d: `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`,
       label,
       lx: (x1 + x2) / 2,
-      ly: (y1 + y2) / 2 - 8,
+      ly: (y1 + y2) / 2 + bend * 0.35 - 8,
     }
   }).filter(Boolean) as {
     edge: (typeof graph.edges)[0]
@@ -480,6 +491,15 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
   const connectFrom = connectDrag
     ? graph.nodes.find((n) => n.id === connectDrag.fromBubbleId)
     : null
+  const connectPreview =
+    connectDrag && connectFrom
+      ? {
+          x1: connectFrom.x + DOT_OUT_X,
+          y1: connectFrom.y + DOT_CENTER_Y,
+          x2: connectDrag.x,
+          y2: connectDrag.y,
+        }
+      : null
 
   return (
     <DialogShell size="xl" className="dialog-workplace" labelledBy="dialog-workplace-title" onClose={onClose}>
@@ -610,16 +630,22 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                     height={18}
                     rx={6}
                   />
-                  <text className="dw-edge-label" x={lx} y={ly + 4} textAnchor="middle">
+                  <text
+                    className="dw-edge-label"
+                    x={lx}
+                    y={ly + 4}
+                    textAnchor="middle"
+                    fill="#f2eefc"
+                  >
                     {label.length > 16 ? `${label.slice(0, 15)}…` : label}
                   </text>
                   <title>Click to remove connection</title>
                 </g>
               ))}
-              {connectDrag && connectFrom ? (
+              {connectPreview ? (
                 <path
                   className="dw-edge dw-edge-preview"
-                  d={`M ${connectFrom.x + BUBBLE_W} ${connectFrom.y + BUBBLE_ANCHOR_Y} L ${connectDrag.x} ${connectDrag.y}`}
+                  d={`M ${connectPreview.x1} ${connectPreview.y1} L ${connectPreview.x2} ${connectPreview.y2}`}
                 />
               ) : null}
             </svg>
@@ -707,25 +733,18 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                                 .join(' ')}
                               title={
                                 target
-                                  ? `Goes to ${target.dialogId}. Click to reconnect this option.`
-                                  : `Click to select, then use the right-side dot to connect.`
+                                  ? `Goes to ${target.dialogId}. Select this button, then use the right-side dot to reconnect.`
+                                  : 'Select this button, then use the right-side dot to connect.'
                               }
                               onPointerDown={(e) => {
                                 e.stopPropagation()
                                 e.preventDefault()
                                 setSelectedId(bubble.id)
                                 setPreferredOption({ bubbleId: bubble.id, key: opt.key })
-                                const pt = clientToCanvas(e.clientX, e.clientY)
-                                setConnect({
-                                  fromBubbleId: bubble.id,
-                                  optionKey: opt.key,
-                                  x: pt.x,
-                                  y: pt.y,
-                                })
                                 setStatus(
-                                  link
-                                    ? `Reconnecting “${chipLabel}”. Click another bubble, or Esc to keep the current link.`
-                                    : `Connecting “${chipLabel}”. Click another bubble to finish. Esc cancels.`,
+                                  target
+                                    ? `“${chipLabel}” selected (→ ${target.dialogId}). Use the right-side dot to reconnect.`
+                                    : `“${chipLabel}” selected. Use the right-side dot to connect it.`,
                                 )
                               }}
                             >
