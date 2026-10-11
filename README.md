@@ -1,6 +1,6 @@
-# Soaps Config Editor
+# SoapsUniverse Studio
 
-A YAML editor that runs in Chrome or Edge. Open a folder on your computer, edit `.yml` files, and save them back to disk. MythicMobs packs are the first workflow.
+A pack and plugin config studio for SoapsUniverse. Open a folder in Chrome or Edge, edit `.yml` files, and save them back to disk. MythicMobs packs are the first workflow.
 
 This is a local web app. You do not need Visual Studio, Rust, or an installer to use it.
 

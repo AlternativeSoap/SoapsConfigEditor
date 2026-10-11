@@ -1373,7 +1373,10 @@ function App() {
     return (
       <main className="welcome dashboard">
         <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
-        <h1>Soaps Config Editor</h1>
+        <h1 className="welcome-brand brand-title">
+          <span className="brand-mark">SoapsUniverse</span>
+          <span className="brand-product">Studio</span>
+        </h1>
         <p className="welcome-note">Loading your last session…</p>
       </main>
     )
@@ -1389,7 +1392,10 @@ function App() {
           width={56}
           height={56}
         />
-        <h1 className="welcome-brand">Soaps Config Editor</h1>
+        <h1 className="welcome-brand brand-title">
+          <span className="brand-mark">SoapsUniverse</span>
+          <span className="brand-product">Studio</span>
+        </h1>
         <p className="welcome-lead">Choose a plugin to continue.</p>
         <WorkspaceTiles
           selected={workspaceId}
@@ -1477,7 +1483,10 @@ function App() {
         <div className="brand">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={28} height={28} />
           <div className="brand-text">
-            <h1>Soaps Config Editor</h1>
+            <h1 className="brand-title">
+              <span className="brand-mark">SoapsUniverse</span>
+              <span className="brand-product">Studio</span>
+            </h1>
             <p className="brand-subtitle">
               {workspace?.name ?? 'YAML'} · {rootLabel}
               {needsSaveFolder ? <span className="brand-badge">Browser only</span> : null}

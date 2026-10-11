@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Soaps Config Editor",
+  "productName": "SoapsUniverse Studio",
   "version": "0.1.0",
   "identifier": "com.soapsuniverse.configeditor",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Soaps Config Editor",
+        "title": "SoapsUniverse Studio",
         "width": 1440,
         "height": 900,
         "minWidth": 1100,

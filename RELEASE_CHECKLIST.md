@@ -1,4 +1,4 @@
-# Soaps Config Editor release notes
+# SoapsUniverse Studio release notes
 
 ## How to test this version
 

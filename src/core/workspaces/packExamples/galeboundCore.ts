@@ -13,7 +13,7 @@ export function buildGaleboundCoreFiles(packName: string, addons: MythicAddons):
       `${base}/packinfo.yml`,
       generatePackInfoYaml({
         name: packName,
-        author: 'Soaps Config Editor',
+        author: 'SoapsUniverse Studio',
         description: [
           '&7Galebound Covenant example pack.',
           '&7Storm-touched mobs, items, and skills linked together.',

@@ -433,7 +433,7 @@ export function createDefaultClassInput(partial?: Partial<ClassGeneratorInput>):
     id,
     displayName: partial?.displayName ?? 'New Class',
     lore: partial?.lore ?? [
-      'A custom class created with Soaps Config Editor.',
+      'A custom class created with SoapsUniverse Studio.',
       'Edit this flavor text to match your theme.',
     ],
     item: partial?.item ?? 'BLAZE_POWDER',
