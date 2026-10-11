@@ -151,6 +151,33 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     applyWorldTransform(pan.x, pan.y, scale)
   }, [pan, scale, panning, applyWorldTransform])
 
+  // Non-passive wheel listener so preventDefault can block page scroll while zooming.
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = el.getBoundingClientRect()
+      const factor = e.deltaY > 0 ? 0.9 : 1.1
+      const prev = scaleRef.current
+      const next = Math.min(2, Math.max(0.35, prev * factor))
+      if (next === prev) return
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const ratio = next / prev
+      const p = panRef.current
+      const nextPan = {
+        x: cx - (cx - p.x) * ratio,
+        y: cy - (cy - p.y) * ratio,
+      }
+      applyWorldTransform(nextPan.x, nextPan.y, next)
+      setPan(nextPan)
+      setScale(next)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [applyWorldTransform])
+
   useEffect(() => {
     const isTypingTarget = (t: EventTarget | null) =>
       t instanceof HTMLInputElement ||
@@ -686,26 +713,6 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
             })
             // Clear selection only; locked settings stay open.
             if (!spaceHeld) setSelectedId(null)
-          }}
-          onWheel={(e) => {
-            e.preventDefault()
-            const rect = canvasRef.current?.getBoundingClientRect()
-            if (!rect) return
-            const factor = e.deltaY > 0 ? 0.9 : 1.1
-            const prev = scaleRef.current
-            const next = Math.min(2, Math.max(0.35, prev * factor))
-            if (next === prev) return
-            const cx = e.clientX - rect.left
-            const cy = e.clientY - rect.top
-            const ratio = next / prev
-            const p = panRef.current
-            const nextPan = {
-              x: cx - (cx - p.x) * ratio,
-              y: cy - (cy - p.y) * ratio,
-            }
-            applyWorldTransform(nextPan.x, nextPan.y, next)
-            setPan(nextPan)
-            setScale(next)
           }}
           onDoubleClick={(e) => {
             if (isInteractiveTarget(e.target) || connectDrag || spaceHeld) return

@@ -2070,6 +2070,15 @@ button.tree-row.pack .chevron {
   color: var(--text-secondary);
 }
 
+.dialog-note-error {
+  margin: 0.35rem 1rem 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, #e35d6a 45%, transparent);
+  background: color-mix(in srgb, #e35d6a 12%, transparent);
+  color: var(--text);
+}
+
 .dialog-card {
   display: grid;
   gap: 0.55rem;

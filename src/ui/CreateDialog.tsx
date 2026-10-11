@@ -111,7 +111,25 @@ interface CreateDialogProps {
   suggestedPath: string
   crucibleEnabled?: boolean
   onClose: () => void
-  onInsert: (targetPath: string, yaml: string) => void
+  /** Return false when the insert was rejected (for example duplicate id). */
+  onInsert: (targetPath: string, yaml: string) => boolean | void
+}
+
+function collectCategoryIds(files: FileRecord[], category: string): Set<string> {
+  const used = new Set<string>()
+  for (const file of files) {
+    if (file.category !== category) continue
+    for (const id of file.ids) used.add(id.toLowerCase())
+  }
+  return used
+}
+
+function nextUniqueId(base: string, used: Set<string>): string {
+  const trimmed = base.trim() || 'NEW'
+  if (!used.has(trimmed.toLowerCase())) return trimmed
+  let n = 2
+  while (used.has(`${trimmed}_${n}`.toLowerCase())) n += 1
+  return `${trimmed}_${n}`
 }
 
 const CATEGORY_FOR_KIND: Record<
@@ -207,17 +225,44 @@ export function CreateDialog({
     initialExisting ? 'existing' : 'new',
   )
   const [targetPath, setTargetPath] = useState(initialExisting)
-  const [mob, setMob] = useState(emptyMob)
+  const usedIds = useMemo(() => collectCategoryIds(files, category), [files, category])
+  const [mob, setMob] = useState(() => ({
+    ...emptyMob,
+    id: nextUniqueId(emptyMob.id, collectCategoryIds(files, 'mobs')),
+  }))
   const [optionSearch, setOptionSearch] = useState('')
   const [showAllOptions, setShowAllOptions] = useState(false)
-  const [item, setItem] = useState(emptyItem)
-  const [skill, setSkill] = useState(emptySkill)
-  const [droptable, setDroptable] = useState(emptyDroptable)
-  const [spawn, setSpawn] = useState(emptySpawn)
-  const [newFileName, setNewFileName] = useState(() =>
-    defaultYamlFileNameFromId(emptyMob.id, kind),
-  )
+  const [item, setItem] = useState(() => ({
+    ...emptyItem,
+    id: nextUniqueId(emptyItem.id, collectCategoryIds(files, 'items')),
+  }))
+  const [skill, setSkill] = useState(() => ({
+    ...emptySkill,
+    id: nextUniqueId(emptySkill.id, collectCategoryIds(files, 'skills')),
+  }))
+  const [droptable, setDroptable] = useState(() => ({
+    ...emptyDroptable,
+    id: nextUniqueId(emptyDroptable.id, collectCategoryIds(files, 'droptables')),
+  }))
+  const [spawn, setSpawn] = useState(() => ({
+    ...emptySpawn,
+    id: nextUniqueId(emptySpawn.id, collectCategoryIds(files, 'randomspawns')),
+  }))
+  const [newFileName, setNewFileName] = useState(() => {
+    const seedId =
+      kind === 'item'
+        ? nextUniqueId(emptyItem.id, collectCategoryIds(files, 'items'))
+        : kind === 'skill'
+          ? nextUniqueId(emptySkill.id, collectCategoryIds(files, 'skills'))
+          : kind === 'droptable'
+            ? nextUniqueId(emptyDroptable.id, collectCategoryIds(files, 'droptables'))
+            : kind === 'randomspawn'
+              ? nextUniqueId(emptySpawn.id, collectCategoryIds(files, 'randomspawns'))
+              : nextUniqueId(emptyMob.id, collectCategoryIds(files, 'mobs'))
+    return defaultYamlFileNameFromId(seedId, kind)
+  })
   const [newFileNameTouched, setNewFileNameTouched] = useState(false)
+  const [insertError, setInsertError] = useState('')
   // Skill line builder state — tracks which textarea + line index is being built
   const [builderOpen, setBuilderOpen] = useState(false)
   const [builderContext, setBuilderContext] = useState<{ source: 'mob' | 'skill'; lineIndex: number; value: string } | null>(null)
@@ -882,6 +927,7 @@ export function CreateDialog({
                       const id = e.target.value
                       setSpawn({ ...spawn, id })
                       syncNewFileNameFromId(id)
+                      setInsertError('')
                     }}
                   />
                 </label>
@@ -1015,6 +1061,12 @@ export function CreateDialog({
 
         <DialogPreviewBlock code={yaml} />
 
+        {insertError ? (
+          <p className="dialog-note dialog-note-error" role="alert">
+            {insertError}
+          </p>
+        ) : null}
+
         <DialogFooter>
           <button type="button" onClick={onClose}>
             Cancel
@@ -1022,7 +1074,31 @@ export function CreateDialog({
           <button
             type="button"
             className="primary"
-            onClick={() => onInsert(effectiveTargetPath, yaml)}
+            onClick={() => {
+              const activeId =
+                kind === 'mob'
+                  ? mob.id
+                  : kind === 'item'
+                    ? item.id
+                    : kind === 'skill'
+                      ? skill.id
+                      : kind === 'droptable'
+                        ? droptable.id
+                        : spawn.id
+              if (usedIds.has(activeId.trim().toLowerCase())) {
+                setInsertError(
+                  `“${activeId.trim()}” already exists in this pack. Change the id, then try again.`,
+                )
+                return
+              }
+              setInsertError('')
+              const result = onInsert(effectiveTargetPath, yaml)
+              if (result === false) {
+                setInsertError(
+                  `Could not add “${activeId.trim()}”. That id may already be in the target file. Change the id and try again.`,
+                )
+              }
+            }}
             disabled={
               !effectiveTargetPath ||
               (targetMode === 'new' && newPathAlreadyExists) ||

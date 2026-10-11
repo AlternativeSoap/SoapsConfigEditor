@@ -1241,9 +1241,12 @@ function App() {
     const currentContent = dirtyMap.get(target.path) ?? target.content
     const newIds = extractTopLevelIds(parseYaml(yaml).data)
     const existingIds = extractTopLevelIds(parseYaml(currentContent).data)
-    const collision = newIds.find((id) => existingIds.includes(id))
+    const existingLower = new Set(existingIds.map((id) => id.toLowerCase()))
+    const collision = newIds.find((id) => existingLower.has(id.toLowerCase()))
     if (collision) {
-      setStatusMessage(`Skill id ${collision} already exists in ${target.path}. Rename the preset ids or remove the duplicate.`)
+      setStatusMessage(
+        `“${collision}” already exists in ${target.path}. Change the id, then add it again.`,
+      )
       return false
     }
     const nextDraft = currentContent.trim() ? `${currentContent.trimEnd()}\n\n${yaml}` : yaml
@@ -1253,7 +1256,11 @@ function App() {
     setFiles((prev) =>
       prev.map((f) =>
         f.path === target.path
-          ? { ...f, ids: extractTopLevelIds(parseYaml(nextDraft).data) }
+          ? {
+              ...f,
+              content: nextDraft,
+              ids: extractTopLevelIds(parseYaml(nextDraft).data),
+            }
           : f,
       ),
     )
@@ -1285,25 +1292,27 @@ function App() {
     setStatusMessage(summary)
   }
 
-  function insertGenerated(targetPath: string, yaml: string): void {
+  function insertGenerated(targetPath: string, yaml: string): boolean {
     const normalized = targetPath.replace(/\\/g, '/')
     const exists = files.some((f) => f.path.replace(/\\/g, '/') === normalized)
 
     if (dirtyMap.has(activePath) && activePath !== normalized) {
       const leave = window.confirm('You have unsaved changes. Discard them and add the new YAML?')
-      if (!leave) return
+      if (!leave) return false
     }
 
     if (!exists) {
       void applyMultiFileWrite([{ path: normalized, content: yaml, mode: 'create' }])
       setStatusMessage(`Created ${normalized}. Save to write it to disk.`)
-      return
+      return true
     }
 
     if (appendYamlToFile(normalized, yaml)) {
       setCreateKind(null)
       setStatusMessage(`Added to ${normalized}. Save the file to keep it.`)
+      return true
     }
+    return false
   }
 
   function insertPresetYaml(yaml: string): void {
