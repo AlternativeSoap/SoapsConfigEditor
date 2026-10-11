@@ -42,6 +42,22 @@ describe('compileDialogGraph', () => {
     expect(compiled.skillsYaml).not.toContain('showdialog{')
   })
 
+  it('runs on-click skill then showdialog when a button is linked', () => {
+    const g = createQuestOfferGraph()
+    const offer = g.nodes.find((n) => n.dialogId === 'QuestOffer')!
+    offer.options = offer.options.map((o) =>
+      o.key === 'accept' ? { ...o, skillId: 'GiveQuestReward' } : o,
+    )
+    const compiled = compileDialogGraph(g)
+    expect(compiled.skillsYaml).toContain('skill{s=GiveQuestReward} @trigger')
+    expect(compiled.skillsYaml).toContain('showdialog{dialog=QuestAccepted}')
+    const skillAt = compiled.skillsYaml.indexOf('skill{s=GiveQuestReward}')
+    const dialogAt = compiled.skillsYaml.indexOf('showdialog{dialog=QuestAccepted}')
+    expect(skillAt).toBeGreaterThan(-1)
+    expect(dialogAt).toBeGreaterThan(skillAt)
+    expect(compiled.dialogYaml).not.toContain('Skill: GiveQuestReward')
+  })
+
   it('skips glue skills for end options with no edge', () => {
     const g = createEmptyGraph('Notice')
     const compiled = compileDialogGraph(g)

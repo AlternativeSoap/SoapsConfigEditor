@@ -24,7 +24,10 @@ export interface DialogOption {
   label: string
   tooltip?: string
   width?: number
-  /** If set, button runs this skill instead of auto glue showDialog */
+  /**
+   * Pack skill to run when the button is clicked.
+   * If the button is also linked to another screen, both run (skill first, then showdialog).
+   */
   skillId?: string
   /** Marks this option as an end (no next bubble); button has no skill or close only */
   isEnd?: boolean

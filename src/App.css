@@ -4873,18 +4873,48 @@ button.tree-row.quest-entry {
   color: var(--text);
 }
 
-.dw-option-chip.linked {
+.dw-option-chip.linked,
+.dw-option-chip.has-skill {
   border-color: color-mix(in srgb, var(--accent, #8b7cf8) 45%, transparent);
   background: color-mix(in srgb, var(--accent, #8b7cf8) 14%, transparent);
   color: var(--text);
 }
 
-.dw-chip-target {
-  opacity: 0.75;
+.dw-chip-target,
+.dw-chip-skill {
+  opacity: 0.8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 7.5rem;
+}
+
+.dw-chip-skill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.62rem;
+  opacity: 0.9;
+}
+
+.dw-options-hint,
+.dw-option-flow {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.dw-option-flow {
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+  background: var(--surface-inset, transparent);
+}
+
+.dw-option-skill {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
 }
 
 .dw-popout {

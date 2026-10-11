@@ -265,7 +265,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const key = newOptionKey('Option', keys)
     const opt: DialogOption = { key, label: `<green>${key}`, width: 150 }
     updateBubble(selected.id, { options: [...selected.options, opt] })
-    setStatus('Option added. Connect this bubble with the right-side dot when you are ready.')
+    setStatus('Answer added. Link it with the right-side dot, or set an on-click skill in settings.')
   }
 
   const removeBubble = (id: string) => {
@@ -332,7 +332,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
       return {
         ...n,
         options: withOption.map((o) =>
-          o.key === link.optionKey ? { ...o, isEnd: false, skillId: undefined } : o,
+          o.key === link.optionKey ? { ...o, isEnd: false } : o,
         ),
       }
     })
@@ -502,7 +502,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
     const writes: { path: string; content: string; mode: 'create' | 'append' }[] = [
       { path: dialogPath, content: compiled.dialogYaml, mode: 'create' },
     ]
-    if (compiled.skillsYaml.includes('showdialog')) {
+    if (/\n\s*Skills:\s*\n/.test(compiled.skillsYaml)) {
       writes.push({ path: skillsPath, content: compiled.skillsYaml, mode: 'create' })
     }
 
@@ -584,13 +584,18 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
       <DialogHeader
         title="Dialog workplace"
         titleId="dialog-workplace-title"
-        lead="Build branching Paper dialogs. Drag freely, connect with the side dots, then save into Dialogs/."
+        lead="Each bubble is one dialog screen. Connect answers with the side dots. Optional on-click skills run when a player picks that answer."
         onClose={onClose}
       />
       <DialogBody className="dw-body">
+        <datalist id="dw-skill-suggestions">
+          {packIndex.skillIds.map((id) => (
+            <option key={id} value={id} />
+          ))}
+        </datalist>
         <aside className="dw-toolbox" aria-label="Dialog tools">
           <button type="button" className="dw-tool" onClick={addBubble}>Add bubble</button>
-          <button type="button" className="dw-tool" onClick={addOption} disabled={!selected}>Add option</button>
+          <button type="button" className="dw-tool" onClick={addOption} disabled={!selected}>Add answer</button>
           <button type="button" className="dw-tool" onClick={deleteSelected} disabled={!selected}>Delete bubble</button>
           <button type="button" className="dw-tool" onClick={undo} disabled={past.length === 0}>Undo</button>
           <button type="button" className="dw-tool" onClick={redo} disabled={future.length === 0}>Redo</button>
@@ -627,7 +632,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
               ))}
             </select>
           </label>
-          <p className="dw-hint">Premium + Paper 1.21.6+. Filenames must contain &quot;dialog&quot;.</p>
+          <p className="dw-hint">
+            Premium + Paper 1.21.6+. Link answers to the next screen. Add an on-click skill when that answer should also run a Mythic skill.
+          </p>
           <p className="dw-status" role="status">{status}</p>
         </aside>
 
@@ -830,6 +837,12 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                           preferredOption?.bubbleId === bubble.id &&
                           preferredOption.key === opt.key
                         const chipLabel = stripMm(opt.label) || opt.key
+                        const skillName = opt.skillId?.trim() || ''
+                        const titleParts = [
+                          target ? `Opens ${target.dialogId}` : 'Not linked to a next screen',
+                          skillName ? `runs skill ${skillName}` : null,
+                          'Select, then use the right-side dot to link.',
+                        ].filter(Boolean)
                         return (
                           <li key={opt.key}>
                             <button
@@ -837,30 +850,34 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                               className={[
                                 'dw-option-chip',
                                 link ? 'linked' : '',
+                                skillName ? 'has-skill' : '',
                                 preferred ? 'preferred' : '',
                               ]
                                 .filter(Boolean)
                                 .join(' ')}
-                              title={
-                                target
-                                  ? `Goes to ${target.dialogId}. Select this button, then use the right-side dot to reconnect.`
-                                  : 'Select this button, then use the right-side dot to connect.'
-                              }
+                              title={titleParts.join('. ') + '.'}
                               onPointerDown={(e) => {
                                 e.stopPropagation()
                                 e.preventDefault()
                                 setSelectedId(bubble.id)
                                 setPreferredOption({ bubbleId: bubble.id, key: opt.key })
+                                const bits = [
+                                  target ? `→ ${target.dialogId}` : null,
+                                  skillName ? `skill ${skillName}` : null,
+                                ].filter(Boolean)
                                 setStatus(
-                                  target
-                                    ? `“${chipLabel}” selected (→ ${target.dialogId}). Use the right-side dot to reconnect.`
-                                    : `“${chipLabel}” selected. Use the right-side dot to connect it.`,
+                                  bits.length > 0
+                                    ? `“${chipLabel}” (${bits.join(', ')}). Use the right-side dot to change the link.`
+                                    : `“${chipLabel}” selected. Use the right-side dot to link the next screen.`,
                                 )
                               }}
                             >
                               {chipLabel}
                               {target ? (
                                 <span className="dw-chip-target">→ {target.dialogId}</span>
+                              ) : null}
+                              {skillName ? (
+                                <span className="dw-chip-skill">{skillName}</span>
                               ) : null}
                             </button>
                           </li>
@@ -978,14 +995,24 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                         </label>
                       </div>
                       <div className="dw-options-edit">
-                        <span className="dw-options-label">Buttons</span>
-                        {bubble.options.map((opt, oi) => (
+                        <span className="dw-options-label">Answers</span>
+                        <p className="dw-options-hint">
+                          Link with the right-side dot. On-click skill is optional and runs before the next screen.
+                        </p>
+                        {bubble.options.map((opt, oi) => {
+                          const linked = graph.edges.find(
+                            (ed) => ed.fromBubbleId === bubble.id && ed.optionKey === opt.key,
+                          )
+                          const nextScreen = linked
+                            ? graph.nodes.find((n) => n.id === linked.toBubbleId)
+                            : null
+                          return (
                           <div key={opt.key} className="dw-option-block">
                             <div className="dw-option-row">
                               <input
                                 value={opt.label}
-                                aria-label={`Button label ${opt.key}`}
-                                placeholder="Label"
+                                aria-label={`Answer label ${opt.key}`}
+                                placeholder="Answer label"
                                 onChange={(e) => {
                                   const options = bubble.options.map((o, i) =>
                                     i === oi ? { ...o, label: e.target.value } : o,
@@ -995,7 +1022,7 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                               />
                               <RemoveButton
                                 size="sm"
-                                aria-label={`Remove option ${opt.key}`}
+                                aria-label={`Remove answer ${opt.key}`}
                                 onClick={() => {
                                   pushHistory({
                                     ...graph,
@@ -1012,24 +1039,26 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                                 }}
                               />
                             </div>
-                            <div className="dw-option-meta-row">
+                            <input
+                              className="dw-option-meta"
+                              value={opt.tooltip ?? ''}
+                              placeholder="Hover tooltip"
+                              aria-label={`Tooltip for ${opt.key}`}
+                              onChange={(e) => {
+                                const options = bubble.options.map((o, i) =>
+                                  i === oi ? { ...o, tooltip: e.target.value } : o,
+                                )
+                                patchBubbleLive(bubble.id, { options })
+                              }}
+                            />
+                            <label className="dw-option-skill">
+                              On-click skill
                               <input
                                 className="dw-option-meta"
-                                value={opt.tooltip ?? ''}
-                                placeholder="Tooltip"
-                                aria-label={`Tooltip for ${opt.key}`}
-                                onChange={(e) => {
-                                  const options = bubble.options.map((o, i) =>
-                                    i === oi ? { ...o, tooltip: e.target.value } : o,
-                                  )
-                                  patchBubbleLive(bubble.id, { options })
-                                }}
-                              />
-                              <input
-                                className="dw-option-meta"
+                                list="dw-skill-suggestions"
                                 value={opt.skillId ?? ''}
-                                placeholder="Custom skill"
-                                aria-label={`Skill for ${opt.key}`}
+                                placeholder="Optional pack skill id"
+                                aria-label={`On-click skill for ${opt.key}`}
                                 onChange={(e) => {
                                   const options = bubble.options.map((o, i) =>
                                     i === oi
@@ -1039,10 +1068,20 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
                                   patchBubbleLive(bubble.id, { options })
                                 }}
                               />
-                            </div>
+                            </label>
+                            <p className="dw-option-flow" aria-live="polite">
+                              {opt.skillId?.trim() && nextScreen
+                                ? `Click runs ${opt.skillId.trim()}, then opens ${nextScreen.dialogId}.`
+                                : nextScreen
+                                  ? `Click opens ${nextScreen.dialogId}.`
+                                  : opt.skillId?.trim()
+                                    ? `Click runs ${opt.skillId.trim()}.`
+                                    : 'Click closes or does nothing until you link a screen or add a skill.'}
+                            </p>
                           </div>
-                        ))}
-                        <button type="button" className="dw-mini" onClick={addOption}>Add option</button>
+                          )
+                        })}
+                        <button type="button" className="dw-mini" onClick={addOption}>Add answer</button>
                       </div>
                     </div>
                   ) : null}
@@ -1072,9 +1111,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
             </div>
             <div className="dw-yaml-scroll">
               <pre>{compiled.dialogYaml}</pre>
-              {compiled.skillsYaml.includes('showdialog') ? (
+              {/\n\s*Skills:\s*\n/.test(compiled.skillsYaml) ? (
                 <>
-                  <h3 className="dw-yaml-title">Link skills</h3>
+                  <h3 className="dw-yaml-title">Answer skills</h3>
                   <pre>{compiled.skillsYaml}</pre>
                 </>
               ) : null}
@@ -1096,9 +1135,9 @@ export function DialogWorkplace({ files, packIndex, onClose, onApply }: DialogWo
             </div>
             <div className="dw-yaml-expanded-scroll">
               <pre>{compiled.dialogYaml}</pre>
-              {compiled.skillsYaml.includes('showdialog') ? (
+              {/\n\s*Skills:\s*\n/.test(compiled.skillsYaml) ? (
                 <>
-                  <h3 className="dw-yaml-title">Link skills</h3>
+                  <h3 className="dw-yaml-title">Answer skills</h3>
                   <pre>{compiled.skillsYaml}</pre>
                 </>
               ) : null}

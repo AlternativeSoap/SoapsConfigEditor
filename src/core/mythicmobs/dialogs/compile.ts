@@ -18,22 +18,30 @@ function resolveOptionSkill(
   option: DialogOption,
   edges: DialogEdge[],
 ): { skillId: string | null; glueYaml: string | null } {
-  if (option.skillId?.trim()) {
-    return { skillId: option.skillId.trim(), glueYaml: null }
-  }
+  const onClick = option.skillId?.trim() || null
   const edge = edges.find((e) => e.fromBubbleId === bubble.id && e.optionKey === option.key)
-  if (!edge) {
-    return { skillId: null, glueYaml: null }
-  }
-  const target = graph.nodes.find((n) => n.id === edge.toBubbleId)
-  if (!target) return { skillId: null, glueYaml: null }
+  const target = edge ? graph.nodes.find((n) => n.id === edge.toBubbleId) : undefined
 
-  const skillId = glueSkillId(graph.graphId, bubble.dialogId, option.key)
-  const glueYaml = `${skillId}:
+  // Skill only (no next screen): point the button at the pack skill directly.
+  if (onClick && !target) {
+    return { skillId: onClick, glueYaml: null }
+  }
+
+  // Next screen only, or skill + next screen: one glue skill the button calls.
+  if (target) {
+    const skillId = glueSkillId(graph.graphId, bubble.dialogId, option.key)
+    const steps = [
+      onClick ? `  - skill{s=${onClick}} @trigger` : null,
+      `  - showdialog{dialog=${target.dialogId}} @trigger`,
+    ].filter(Boolean)
+    const glueYaml = `${skillId}:
   Skills:
-  - showdialog{dialog=${target.dialogId}} @trigger
+${steps.join('\n')}
 `
-  return { skillId, glueYaml }
+    return { skillId, glueYaml }
+  }
+
+  return { skillId: null, glueYaml: null }
 }
 
 function emitBubbleYaml(
